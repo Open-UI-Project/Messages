@@ -1,0 +1,1 @@
+An open-source SMS app from the Open UI Project family. It is a very lightweight application featuring a design similar to Samsung's One UI. It does not collect telemetry or user data.
