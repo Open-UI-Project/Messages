@@ -1,1 +1,1 @@
-Приложение для обмена SMS с открытым исходным кодом из семейства Open UI Project.
+Open-source SMS-клиент в рамках экосистемы Open UI Project.
