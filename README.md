@@ -51,5 +51,5 @@ The compiled APK will be generated at `app/build/outputs/apk/release/`.
 
 ## 📄 License
 
-Open UI Project — Open Source under the MIT License.
+Open UI Project — Open Source under the GPL3.0 License.
 
