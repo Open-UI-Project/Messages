@@ -6,6 +6,7 @@ import android.net.Uri
 import android.telephony.SmsManager
 import android.util.Log
 
+@Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
 class HeadlessSmsSendService : IntentService(TAG) {
 
     override fun onHandleIntent(intent: Intent?) {

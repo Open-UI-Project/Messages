@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SEND_RESPOND_VIA_MESSAGE" />
@@ -96,6 +99,12 @@
                 <action android:name="org.openui.sms.ACTION_SMS_DELIVERED" />
             </intent-filter>
         </receiver>
+
+        <provider
+            android:name=".contacts.provider.OpenUIContactsProvider"
+            android:authorities="org.openui.sms.contacts.provider"
+            android:exported="true"
+            android:grantUriPermissions="true" />
 
     </application>
 

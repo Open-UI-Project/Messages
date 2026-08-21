@@ -5,9 +5,10 @@ import android.provider.Telephony
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import org.openui.sms.contacts.model.CallLogItem
+import org.openui.sms.contacts.model.ContactItem
 import org.openui.sms.sms.data.DefaultSmsRepository
 import org.openui.sms.sms.data.SmsRepository
-import org.openui.sms.sms.model.ContactItem
 import org.openui.sms.sms.model.SmsConversation
 import org.openui.sms.sms.model.SmsMessage
 import org.openui.sms.sms.model.SmsSendResult
@@ -25,10 +26,13 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import androidx.compose.runtime.Immutable
+
 enum class PermissionStatus {
     UNKNOWN, GRANTED, DENIED
 }
 
+@Immutable
 data class SmsGroup(
     val name: String,
     val threadIds: List<Long>
@@ -81,6 +85,10 @@ class SmsViewModel(private val repository: SmsRepository) : ViewModel() {
             val list = repository.getAllContacts()
             _contacts.value = list
         }
+    }
+
+    suspend fun getCallLogsForNumber(phoneNumber: String): List<CallLogItem> {
+        return repository.getCallLogsForNumber(phoneNumber)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

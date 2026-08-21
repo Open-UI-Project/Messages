@@ -1,8 +1,33 @@
 package org.openui.sms.sms.model
 
+import androidx.compose.runtime.Immutable
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+private val timeFormatCache = ThreadLocal.withInitial { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+private val dayHeaderFormatSameYearCache = ThreadLocal.withInitial { SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()) }
+private val dayHeaderFormatOtherYearCache = ThreadLocal.withInitial { SimpleDateFormat("d MMMM yyyy", Locale.getDefault()) }
+private val convDateFormatCache = ThreadLocal.withInitial { SimpleDateFormat("dd.MM", Locale.getDefault()) }
+
+private fun formatMessageTime(ts: Long): String = (timeFormatCache.get() ?: SimpleDateFormat("HH:mm", Locale.getDefault())).format(Date(ts))
+
+private fun formatDayHeader(ts: Long): String {
+    val now = Calendar.getInstance()
+    val msgCal = Calendar.getInstance().apply { timeInMillis = ts }
+    val sameYear = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR)
+    val dayDiff = now.get(Calendar.DAY_OF_YEAR) - msgCal.get(Calendar.DAY_OF_YEAR)
+
+    return when {
+        sameYear && dayDiff == 0 -> "Today"
+        sameYear && dayDiff == 1 -> "Yesterday"
+        sameYear -> (dayHeaderFormatSameYearCache.get() ?: SimpleDateFormat("EEEE, d MMMM", Locale.getDefault())).format(Date(ts)).replaceFirstChar { it.uppercase() }
+        else -> (dayHeaderFormatOtherYearCache.get() ?: SimpleDateFormat("d MMMM yyyy", Locale.getDefault())).format(Date(ts))
+    }
+}
+
+private fun formatConversationDate(ts: Long): String = (convDateFormatCache.get() ?: SimpleDateFormat("dd.MM", Locale.getDefault())).format(Date(ts))
 
 enum class MessageBoxType(val code: Int) {
     INBOX(1),
@@ -18,6 +43,7 @@ enum class MessageBoxType(val code: Int) {
     }
 }
 
+@Immutable
 data class SmsMessage(
     val id: Long,
     val threadId: Long,
@@ -26,33 +52,14 @@ data class SmsMessage(
     val body: String,
     val timestamp: Long,
     val boxType: MessageBoxType,
-    val isRead: Boolean
-) {
-    val displayName: String
-        get() = contactName ?: address
+    val isRead: Boolean,
+    val displayName: String = contactName ?: address,
+    val title: String = displayName,
+    val formattedDate: String = formatMessageTime(timestamp),
+    val formattedDayHeader: String = formatDayHeader(timestamp)
+)
 
-    val title: String
-        get() = displayName
-
-    val formattedDate: String
-        get() = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
-
-    val formattedDayHeader: String
-        get() {
-            val now = java.util.Calendar.getInstance()
-            val msgCal = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-            val sameYear = now.get(java.util.Calendar.YEAR) == msgCal.get(java.util.Calendar.YEAR)
-            val dayDiff = now.get(java.util.Calendar.DAY_OF_YEAR) - msgCal.get(java.util.Calendar.DAY_OF_YEAR)
-            
-            return when {
-                sameYear && dayDiff == 0 -> "Today"
-                sameYear && dayDiff == 1 -> "Yesterday"
-                sameYear -> SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date(timestamp)).replaceFirstChar { it.uppercase() }
-                else -> SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date(timestamp))
-            }
-        }
-}
-
+@Immutable
 data class SmsConversation(
     val threadId: Long,
     val address: String,
@@ -61,14 +68,8 @@ data class SmsConversation(
     val lastTimestamp: Long,
     val unreadCount: Int,
     val messageCount: Int,
-    val hardcodedDate: String? = null
-) {
-    val displayName: String
-        get() = contactName ?: address
-
-    val title: String
-        get() = displayName
-
-    val formattedDate: String
-        get() = hardcodedDate ?: SimpleDateFormat("dd.MM", Locale.getDefault()).format(Date(lastTimestamp))
-}
+    val hardcodedDate: String? = null,
+    val displayName: String = contactName ?: address,
+    val title: String = displayName,
+    val formattedDate: String = hardcodedDate ?: formatConversationDate(lastTimestamp)
+)

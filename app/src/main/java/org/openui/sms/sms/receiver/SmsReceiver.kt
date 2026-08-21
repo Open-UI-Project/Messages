@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.content.ContentValues
 import android.provider.Telephony
 import androidx.core.app.NotificationCompat
 import org.openui.sms.MainActivity
@@ -15,13 +16,39 @@ import org.openui.sms.R
 class SmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+        val action = intent.action
+        if (action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION || action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             if (!messages.isNullOrEmpty()) {
                 val sender = messages[0].displayOriginatingAddress ?: "SMS"
                 val body = messages.joinToString("") { it.displayMessageBody ?: "" }
-                showNotification(context, sender, body)
+                val timestamp = messages[0].timestampMillis
+
+                if (action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
+                    saveMessageToProvider(context, sender, body, timestamp)
+                    showNotification(context, sender, body)
+                } else {
+                    val isDefault = context.packageName == Telephony.Sms.getDefaultSmsPackage(context)
+                    if (!isDefault) {
+                        showNotification(context, sender, body)
+                    }
+                }
             }
+        }
+    }
+
+    private fun saveMessageToProvider(context: Context, sender: String, body: String, timestamp: Long) {
+        try {
+            val values = ContentValues().apply {
+                put(Telephony.Sms.ADDRESS, sender)
+                put(Telephony.Sms.BODY, body)
+                put(Telephony.Sms.DATE, if (timestamp > 0) timestamp else System.currentTimeMillis())
+                put(Telephony.Sms.READ, 0)
+                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX)
+            }
+            context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

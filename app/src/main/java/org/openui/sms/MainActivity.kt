@@ -14,6 +14,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,7 +76,7 @@ import org.openui.sms.sms.ui.components.SmsFab
 import org.openui.sms.sms.ui.components.SmsIslandNavigationBar
 import org.openui.sms.sms.ui.components.SmsTopBar
 import org.openui.sms.sms.ui.model.SmsTab
-import org.openui.sms.sms.ui.screen.SmsContactsScreen
+import org.openui.sms.contacts.ui.SmsContactsScreen
 import org.openui.sms.sms.ui.screen.SmsThreadScreen
 import org.openui.sms.ui.theme.MyApplicationTheme
 import org.openui.sms.ui.theme.OpenUIBlack
@@ -129,6 +137,8 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
     val activeRecipient by viewModel.activeRecipient.collectAsState()
     val activeThreadTitle by viewModel.activeThreadTitle.collectAsState()
 
+    var isContactDetailOpen by remember { mutableStateOf(false) }
+
     var showNewSmsDialog by remember { mutableStateOf(false) }
     var showCreateGroupDialog by remember { mutableStateOf(false) }
     var showMarkAllAsReadDialog by remember { mutableStateOf(false) }
@@ -139,7 +149,9 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
             Manifest.permission.READ_SMS,
             Manifest.permission.SEND_SMS,
             Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_CONTACTS
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.CALL_PHONE
         ).apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
@@ -293,8 +305,11 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
             }
         }
 
-        LaunchedEffect(isDefaultSmsApp) {
-            if (!isDefaultSmsApp) {
+        val permissionStatus by viewModel.permissionStatus.collectAsState()
+        val contacts by viewModel.contacts.collectAsState()
+
+        LaunchedEffect(permissionStatus, isDefaultSmsApp) {
+            if (permissionStatus == org.openui.sms.sms.ui.PermissionStatus.GRANTED && !isDefaultSmsApp) {
                 requestDefaultSms()
             }
         }
@@ -304,39 +319,100 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                 .fillMaxSize()
                 .background(OpenUIBlack)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (selectedTab == SmsTab.CONVERSATIONS) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SmsTopBar(
-                        groups = groups,
-                        selectedGroup = selectedGroupName,
-                        searchQuery = searchQuery,
-                        onGroupSelect = { viewModel.selectGroup(it) },
-                        onCreateGroupClick = { showCreateGroupDialog = true },
-                        onSearchQueryChange = { viewModel.updateSearchQuery(it) },
-                        onMarkAllAsReadClick = { showMarkAllAsReadDialog = true },
-                        onMakeDefaultAppClick = { requestDefaultSms() },
-                        onAboutClick = { showAboutDialog = true }
-                    )
-                }
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    if (targetState == SmsTab.CONTACTS) {
+                        (slideInHorizontally(
+                            initialOffsetX = { fullWidth -> fullWidth },
+                            animationSpec = tween(280, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(280))).togetherWith(
+                            slideOutHorizontally(
+                                targetOffsetX = { fullWidth -> -fullWidth / 3 },
+                                animationSpec = tween(280, easing = FastOutSlowInEasing)
+                            ) + fadeOut(animationSpec = tween(180))
+                        )
+                    } else {
+                        (slideInHorizontally(
+                            initialOffsetX = { fullWidth -> -fullWidth / 3 },
+                            animationSpec = tween(280, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(280))).togetherWith(
+                            slideOutHorizontally(
+                                targetOffsetX = { fullWidth -> fullWidth },
+                                animationSpec = tween(280, easing = FastOutSlowInEasing)
+                            ) + fadeOut(animationSpec = tween(180))
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "TabContentTransition"
+            ) { currentTab ->
+                when (currentTab) {
+                    SmsTab.CONVERSATIONS -> {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            SmsTopBar(
+                                groups = groups,
+                                selectedGroup = selectedGroupName,
+                                searchQuery = searchQuery,
+                                onGroupSelect = { viewModel.selectGroup(it) },
+                                onCreateGroupClick = { showCreateGroupDialog = true },
+                                onSearchQueryChange = { viewModel.updateSearchQuery(it) },
+                                onMarkAllAsReadClick = { showMarkAllAsReadDialog = true },
+                                onMakeDefaultAppClick = { requestDefaultSms() },
+                                onAboutClick = { showAboutDialog = true }
+                            )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .then(
-                            if (selectedTab == SmsTab.CONVERSATIONS) {
-                                Modifier
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
                                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                                     .background(OpenUICardBackground)
-                            } else {
-                                Modifier.background(OpenUIBlack)
-                            }
-                        )
-                ) {
-                    when (selectedTab) {
-                        SmsTab.CONVERSATIONS -> {
-                            if (isLoading) {
+                            ) {
+                            if (permissionStatus == org.openui.sms.sms.ui.PermissionStatus.DENIED) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.perm_required_title),
+                                        color = Color.White,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = stringResource(R.string.perm_required_desc),
+                                        color = OpenUITextSecondary,
+                                        fontSize = 14.sp,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Button(
+                                        onClick = { permissionLauncher.launch(permissions) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = OpenUIOrangeBadge),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(stringResource(R.string.perm_grant_btn), color = Color.White, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    TextButton(
+                                        onClick = {
+                                            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                data = android.net.Uri.fromParts("package", context.packageName, null)
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(intent)
+                                        }
+                                    ) {
+                                        Text(stringResource(R.string.perm_settings_btn), color = OpenUITextSecondary)
+                                    }
+                                }
+                            } else if (isLoading) {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
@@ -381,9 +457,10 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                 }
                             }
                         }
+                    }
+                }
 
-                    SmsTab.CONTACTS -> {
-                        val contacts by viewModel.contacts.collectAsState()
+                SmsTab.CONTACTS -> {
                         SmsContactsScreen(
                             contacts = contacts,
                             onContactClick = { number, name, _ ->
@@ -397,8 +474,7 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                         name ?: existing.title
                                     )
                                 } else {
-                                    viewModel.selectThread(null, number, name ?: number)
-                                    showNewSmsDialog = true
+                                    viewModel.selectThread(-1L, number, name ?: number)
                                 }
                             },
                             onRequestPermissions = {
@@ -407,35 +483,44 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                         Manifest.permission.READ_SMS,
                                         Manifest.permission.RECEIVE_SMS,
                                         Manifest.permission.SEND_SMS,
-                                        Manifest.permission.READ_CONTACTS
+                                        Manifest.permission.READ_CONTACTS,
+                                        Manifest.permission.READ_CALL_LOG,
+                                        Manifest.permission.CALL_PHONE
                                     )
                                 )
                             },
                             onRefresh = {
                                 viewModel.loadContacts()
+                            },
+                            onFetchCallLogs = { number ->
+                                viewModel.getCallLogsForNumber(number)
+                            },
+                            onDetailStateChanged = { isOpen ->
+                                isContactDetailOpen = isOpen
                             }
                         )
                     }
                 }
             }
-        }
 
-            SmsIslandNavigationBar(
-                selectedTab = selectedTab,
-                onTabSelected = { viewModel.setSelectedTab(it) },
-                totalUnreadCount = allConversations.sumOf { it.unreadCount },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 8.dp)
-            )
+            if (!isContactDetailOpen) {
+                SmsIslandNavigationBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { viewModel.setSelectedTab(it) },
+                    totalUnreadCount = allConversations.sumOf { it.unreadCount },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp)
+                )
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(end = 20.dp, bottom = 18.dp)
-            ) {
-                SmsFab(onClick = { showNewSmsDialog = true })
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(end = 20.dp, bottom = 18.dp)
+                ) {
+                    SmsFab(onClick = { showNewSmsDialog = true })
+                }
             }
         }
     }

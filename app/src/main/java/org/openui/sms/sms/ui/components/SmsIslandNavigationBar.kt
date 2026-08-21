@@ -1,6 +1,9 @@
 package org.openui.sms.sms.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -113,6 +117,15 @@ private fun SmsIslandTabItem(
         label = "contentColor"
     )
 
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.06f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "tabScale"
+    )
+
     Box(
         modifier = modifier
             .height(50.dp)
@@ -130,6 +143,7 @@ private fun SmsIslandTabItem(
         contentAlignment = Alignment.Center
     ) {
         Column(
+            modifier = Modifier.scale(scale),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {

@@ -2,6 +2,7 @@ package org.openui.sms.sms.ui.components
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -75,13 +76,19 @@ fun AboutDialog(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Spacer(modifier = Modifier.height(10.dp))
-                    Image(
-                        painter = painterResource(id = R.drawable.openui_logo),
-                        contentDescription = "Open UI Logo",
+                    Box(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(RoundedCornerShape(20.dp))
-                    )
+                            .background(Color(0xFF2B82FB)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = "App Icon",
+                            modifier = Modifier.size(68.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = stringResource(R.string.about_title),
@@ -233,8 +240,14 @@ fun AboutDialog(
                     Spacer(modifier = Modifier.height(20.dp))
                     Button(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(githubUrl))
-                            context.startActivity(intent)
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(githubUrl)).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()

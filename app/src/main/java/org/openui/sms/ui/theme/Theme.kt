@@ -7,8 +7,48 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
+
+data class AppCustomColors(
+    val background: Color,
+    val surface: Color,
+    val card: Color,
+    val cardElevated: Color,
+    val divider: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textMuted: Color,
+    val primaryBrand: Color,
+    val dialerGreen: Color,
+    val actionRed: Color,
+    val isDark: Boolean
+)
+
+val LocalAppColors = staticCompositionLocalOf {
+    AppCustomColors(
+        background = OpenUIBlack,
+        surface = OpenUISurface,
+        card = OpenUICardBackground,
+        cardElevated = OpenUIPillBackground,
+        divider = OpenUIDivider,
+        textPrimary = OpenUITextPrimary,
+        textSecondary = OpenUITextSecondary,
+        textMuted = OpenUITextSecondary,
+        primaryBrand = Color(0xFF00A88F),
+        dialerGreen = Color(0xFF00C853),
+        actionRed = Color(0xFFFF5252),
+        isDark = true
+    )
+}
+
+object AppTheme {
+    val colors: AppCustomColors
+        @Composable
+        get() = LocalAppColors.current
+}
 
 private val OpenUIDarkColorScheme = darkColorScheme(
     primary = Color(0xFF00A88F),
@@ -41,10 +81,27 @@ fun MyApplicationTheme(
         else -> OpenUIDarkColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
+    val appColors = AppCustomColors(
+        background = OpenUIBlack,
+        surface = OpenUISurface,
+        card = OpenUICardBackground,
+        cardElevated = OpenUIPillBackground,
+        divider = OpenUIDivider,
+        textPrimary = OpenUITextPrimary,
+        textSecondary = OpenUITextSecondary,
+        textMuted = OpenUITextSecondary,
+        primaryBrand = Color(0xFF00A88F),
+        dialerGreen = Color(0xFF00C853),
+        actionRed = Color(0xFFFF5252),
+        isDark = darkTheme
     )
+
+    CompositionLocalProvider(LocalAppColors provides appColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
 

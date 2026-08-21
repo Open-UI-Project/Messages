@@ -33,6 +33,9 @@ import org.openui.sms.sms.model.SmsConversation
 private val AvatarBgColor = Color(0xFF393939)
 private val SubtextColor = Color(0xFFA8A8A8)
 private val UnreadBadgeColor = Color(0xFFDD5928)
+private val AvatarIconTint = Color(0xCCFFFFFF)
+private val BadgeShape = RoundedCornerShape(10.dp)
+private val AvatarShape = CircleShape
 
 @Composable
 fun SmsConversationItem(
@@ -54,14 +57,14 @@ fun SmsConversationItem(
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .clip(CircleShape)
+                .clip(AvatarShape)
                 .background(AvatarBgColor),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Rounded.Person,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.8f),
+                tint = AvatarIconTint,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -108,7 +111,7 @@ fun SmsConversationItem(
             if (conversation.unreadCount > 0) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(BadgeShape)
                         .background(UnreadBadgeColor)
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center

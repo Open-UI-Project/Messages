@@ -82,6 +82,12 @@ import org.openui.sms.ui.theme.OpenUITextSecondary
 
 private val EmojisList = listOf("😊", "👍", "❤️", "😂", "🔥", "🙏", "🎉", "👋", "🥳", "💡", "📱", "🤣", "🙌", "⭐")
 
+private sealed interface ThreadListItem {
+    val key: String
+    data class DateHeader(val text: String, override val key: String) : ThreadListItem
+    data class MessageBubbleItem(val message: SmsMessage, override val key: String) : ThreadListItem
+}
+
 @Composable
 fun SmsThreadScreen(
     title: String,
@@ -100,6 +106,18 @@ fun SmsThreadScreen(
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showAttachmentsMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+
+    val threadItems = remember(messages) {
+        val itemsList = mutableListOf<ThreadListItem>()
+        messages.forEachIndexed { index, message ->
+            val showHeader = index == 0 || message.formattedDayHeader != messages[index - 1].formattedDayHeader
+            if (showHeader) {
+                itemsList.add(ThreadListItem.DateHeader(message.formattedDayHeader, "header_${message.timestamp}_$index"))
+            }
+            itemsList.add(ThreadListItem.MessageBubbleItem(message, "msg_${message.id}_$index"))
+        }
+        itemsList
+    }
 
     LaunchedEffect(inputText) {
         if (inputText.isBlank()) {
@@ -203,10 +221,18 @@ fun SmsThreadScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            messages.forEachIndexed { index, message ->
-                val showHeader = index == 0 || message.formattedDayHeader != messages[index - 1].formattedDayHeader
-                if (showHeader) {
-                    item(key = "header_${message.timestamp}_$index", contentType = "date_header") {
+            items(
+                items = threadItems,
+                key = { it.key },
+                contentType = {
+                    when (it) {
+                        is ThreadListItem.DateHeader -> "date_header"
+                        is ThreadListItem.MessageBubbleItem -> "message_bubble"
+                    }
+                }
+            ) { item ->
+                when (item) {
+                    is ThreadListItem.DateHeader -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -214,23 +240,22 @@ fun SmsThreadScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = message.formattedDayHeader,
+                                text = item.text,
                                 color = OpenUITextSecondary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
                     }
-                }
-
-                item(key = "msg_${message.id}_$index", contentType = "message_bubble") {
-                    SmsMessageBubble(
-                        message = message,
-                        onDeleteClick = { onDeleteMessageClick(message.id) },
-                        onForwardClick = { forwardText ->
-                            inputText = forwardText
-                        }
-                    )
+                    is ThreadListItem.MessageBubbleItem -> {
+                        SmsMessageBubble(
+                            message = item.message,
+                            onDeleteClick = { onDeleteMessageClick(item.message.id) },
+                            onForwardClick = { forwardText ->
+                                inputText = forwardText
+                            }
+                        )
+                    }
                 }
             }
 

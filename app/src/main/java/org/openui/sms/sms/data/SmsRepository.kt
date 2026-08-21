@@ -15,17 +15,24 @@ import android.provider.Telephony
 import android.telephony.SmsManager
 import android.util.Log
 import androidx.collection.LruCache
-import org.openui.sms.sms.model.ContactItem
+import org.openui.sms.contacts.data.ContactManager
+import org.openui.sms.contacts.model.CallLogItem
+import org.openui.sms.contacts.model.CallType
+import org.openui.sms.contacts.model.ContactItem
 import org.openui.sms.sms.model.MessageBoxType
 import org.openui.sms.sms.model.SmsConversation
 import org.openui.sms.sms.model.SmsMessage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+import android.provider.CallLog
 
 interface SmsRepository {
     fun getConversations(): Flow<List<SmsConversation>>
@@ -37,6 +44,7 @@ interface SmsRepository {
     suspend fun deleteConversation(threadId: Long): Boolean
     suspend fun resolveContactName(phoneNumber: String): String?
     suspend fun getAllContacts(): List<ContactItem>
+    suspend fun getCallLogsForNumber(phoneNumber: String): List<CallLogItem>
 }
 
 class DefaultSmsRepository(private val context: Context) : SmsRepository {
@@ -47,7 +55,9 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     override fun getConversations(): Flow<List<SmsConversation>> = callbackFlow {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
-                trySend(loadConversationsInternal())
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    trySend(loadConversationsInternal())
+                }
             }
         }
 
@@ -75,7 +85,9 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     override fun getMessagesForThread(threadId: Long): Flow<List<SmsMessage>> = callbackFlow {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
-                trySend(loadMessagesForThreadInternal(threadId))
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    trySend(loadMessagesForThreadInternal(threadId))
+                }
             }
         }
 
@@ -101,114 +113,89 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
         .flowOn(Dispatchers.IO)
 
     private fun loadConversationsInternal(): List<SmsConversation> {
+        var list = queryConversationsFromUri(Telephony.Sms.CONTENT_URI)
+        if (list.isEmpty()) {
+            Log.w(TAG, "Telephony.Sms.CONTENT_URI returned 0 items, trying mms-sms/conversations")
+            list = queryConversationsFromUri(Uri.parse("content://mms-sms/conversations?simple=true"))
+        }
+        if (list.isEmpty()) {
+            Log.w(TAG, "mms-sms/conversations returned 0 items, trying inbox/sent fallback")
+            val inboxList = queryConversationsFromUri(Uri.parse("content://sms/inbox"))
+            val sentList = queryConversationsFromUri(Uri.parse("content://sms/sent"))
+            list = mergeConversations(inboxList + sentList)
+        }
+        if (list.isEmpty()) {
+            Log.w(TAG, "Trying content://sms fallback")
+            list = queryConversationsFromUri(Uri.parse("content://sms"))
+        }
+        return list
+    }
+
+    private fun queryConversationsFromUri(uri: Uri): List<SmsConversation> {
         val conversationsMap = LinkedHashMap<Long, SmsConversationBuilder>()
 
-        // First attempt fast query using content://sms/conversations
-        val conversationsUri = Uri.parse("content://sms/conversations")
-        var loadedViaConversationsUri = false
-
         try {
-            val proj = arrayOf(
-                "thread_id",
-                "msg_count",
-                "snippet",
-                "address",
-                "date",
-                "read"
-            )
             contentResolver.query(
-                conversationsUri,
-                proj,
+                uri,
                 null,
                 null,
-                "date DESC"
+                null,
+                "${Telephony.Sms.DATE} DESC"
             )?.use { cursor ->
-                val threadIdIdx = cursor.getColumnIndex("thread_id")
-                val msgCountIdx = cursor.getColumnIndex("msg_count")
-                val snippetIdx = cursor.getColumnIndex("snippet")
-                val addressIdx = cursor.getColumnIndex("address")
-                val dateIdx = cursor.getColumnIndex("date")
-                val readIdx = cursor.getColumnIndex("read")
+                val threadIdIdx = cursor.getColumnIndex(Telephony.Sms.THREAD_ID)
+                val addressIdx = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
+                val bodyIdx = cursor.getColumnIndex(Telephony.Sms.BODY)
+                val dateIdx = cursor.getColumnIndex(Telephony.Sms.DATE)
+                val readIdx = cursor.getColumnIndex(Telephony.Sms.READ)
 
-                if (threadIdIdx != -1 && dateIdx != -1) {
-                    while (cursor.moveToNext()) {
-                        val threadId = cursor.getLong(threadIdIdx)
-                        val address = if (addressIdx != -1) cursor.getString(addressIdx) ?: "Unknown" else "Unknown"
-                        val snippet = if (snippetIdx != -1) cursor.getString(snippetIdx) ?: "Unknown" else "Unknown"
-                        val timestamp = cursor.getLong(dateIdx)
-                        val msgCount = if (msgCountIdx != -1) cursor.getInt(msgCountIdx) else 1
-                        val isRead = if (readIdx != -1) cursor.getInt(readIdx) == 1 else true
+                while (cursor.moveToNext()) {
+                    val rawThreadId = if (threadIdIdx != -1) cursor.getLong(threadIdIdx) else 0L
+                    val address = if (addressIdx != -1) cursor.getString(addressIdx) ?: "" else ""
+                    val body = if (bodyIdx != -1) cursor.getString(bodyIdx) ?: "" else ""
+                    val timestamp = if (dateIdx != -1) cursor.getLong(dateIdx) else 0L
+                    val isRead = if (readIdx != -1) cursor.getInt(readIdx) == 1 else true
 
-                        conversationsMap[threadId] = SmsConversationBuilder(
+                    val safeAddress = if (address.isNotBlank()) address else "Unknown"
+                    val threadId = if (rawThreadId > 0) {
+                        rawThreadId
+                    } else if (safeAddress != "Unknown") {
+                        val cleanNum = safeAddress.replace(Regex("[^0-9+]"), "")
+                        val key = if (cleanNum.length >= 7) cleanNum.takeLast(7) else cleanNum
+                        if (key.isNotBlank()) (key.hashCode().toLong() and 0x7FFFFFFF) else 0L
+                    } else {
+                        0L
+                    }
+
+                    val builder = conversationsMap.getOrPut(threadId) {
+                        SmsConversationBuilder(
                             threadId = threadId,
-                            address = address,
-                            snippet = snippet,
-                            lastTimestamp = timestamp,
-                            messageCount = msgCount,
-                            unreadCount = if (!isRead) 1 else 0
+                            address = safeAddress,
+                            snippet = body,
+                            lastTimestamp = timestamp
                         )
                     }
-                    loadedViaConversationsUri = conversationsMap.isNotEmpty()
+
+                    if (timestamp > builder.lastTimestamp) {
+                        builder.lastTimestamp = timestamp
+                        builder.snippet = body
+                    }
+
+                    if ((builder.address == "Unknown" || builder.address.isBlank()) && safeAddress != "Unknown") {
+                        builder.address = safeAddress
+                    }
+
+                    builder.messageCount++
+                    if (!isRead) {
+                        builder.unreadCount++
+                    }
                 }
             }
         } catch (e: Exception) {
-            Log.d(TAG, "Fast conversations query not supported, fallback to Telephony.Sms", e)
+            Log.e(TAG, "Error querying conversations from $uri", e)
+            return emptyList()
         }
 
-        // Fallback if content://sms/conversations isn't populated or available
-        if (!loadedViaConversationsUri) {
-            val projection = arrayOf(
-                Telephony.Sms.THREAD_ID,
-                Telephony.Sms.ADDRESS,
-                Telephony.Sms.BODY,
-                Telephony.Sms.DATE,
-                Telephony.Sms.READ
-            )
-
-            try {
-                contentResolver.query(
-                    Telephony.Sms.CONTENT_URI,
-                    projection,
-                    null,
-                    null,
-                    "${Telephony.Sms.DATE} DESC"
-                )?.use { cursor ->
-                    val threadIdIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
-                    val addressIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
-                    val bodyIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                    val dateIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
-                    val readIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.READ)
-
-                    while (cursor.moveToNext()) {
-                        val threadId = cursor.getLong(threadIdIdx)
-                        val address = cursor.getString(addressIdx) ?: "Unknown"
-                        val body = cursor.getString(bodyIdx) ?: ""
-                        val timestamp = cursor.getLong(dateIdx)
-                        val isRead = cursor.getInt(readIdx) == 1
-
-                        val builder = conversationsMap.getOrPut(threadId) {
-                            SmsConversationBuilder(
-                                threadId = threadId,
-                                address = address,
-                                snippet = body,
-                                lastTimestamp = timestamp
-                            )
-                        }
-
-                        builder.messageCount++
-                        if (!isRead) {
-                            builder.unreadCount++
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading conversations via Telephony.Sms", e)
-                return emptyList()
-            }
-        } else {
-            // Fill missing addresses if necessary
-            fillMissingAddresses(conversationsMap)
-        }
+        fillMissingAddresses(conversationsMap)
 
         return conversationsMap.values.map { builder ->
             val contactName = resolveContactNameSync(builder.address)
@@ -222,6 +209,90 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
                 lastTimestamp = builder.lastTimestamp
             )
         }.sortedByDescending { it.lastTimestamp }
+    }
+
+    private fun mergeConversations(items: List<SmsConversation>): List<SmsConversation> {
+        val map = LinkedHashMap<Long, SmsConversation>()
+        for (item in items) {
+            val existing = map[item.threadId]
+            if (existing == null) {
+                map[item.threadId] = item
+            } else {
+                val newestTimestamp = maxOf(existing.lastTimestamp, item.lastTimestamp)
+                val newestSnippet = if (item.lastTimestamp >= existing.lastTimestamp) item.snippet else existing.snippet
+                map[item.threadId] = existing.copy(
+                    lastTimestamp = newestTimestamp,
+                    snippet = newestSnippet,
+                    unreadCount = existing.unreadCount + item.unreadCount,
+                    messageCount = existing.messageCount + item.messageCount
+                )
+            }
+        }
+        return map.values.sortedByDescending { it.lastTimestamp }
+    }
+
+    override suspend fun getCallLogsForNumber(phoneNumber: String): List<CallLogItem> = withContext(Dispatchers.IO) {
+        val result = mutableListOf<CallLogItem>()
+        if (phoneNumber.isBlank()) return@withContext result
+
+        val cleanNum = phoneNumber.replace("[^0-9+]".toRegex(), "")
+        val lastDigits = if (cleanNum.length >= 7) cleanNum.takeLast(7) else cleanNum
+
+        val projection = arrayOf(
+            CallLog.Calls._ID,
+            CallLog.Calls.NUMBER,
+            CallLog.Calls.TYPE,
+            CallLog.Calls.DATE,
+            CallLog.Calls.DURATION
+        )
+
+        try {
+            val selection = "${CallLog.Calls.NUMBER} LIKE ?"
+            val selectionArgs = arrayOf("%$lastDigits")
+
+            contentResolver.query(
+                CallLog.Calls.CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                "${CallLog.Calls.DATE} DESC"
+            )?.use { cursor ->
+                val idIdx = cursor.getColumnIndex(CallLog.Calls._ID)
+                val numIdx = cursor.getColumnIndex(CallLog.Calls.NUMBER)
+                val typeIdx = cursor.getColumnIndex(CallLog.Calls.TYPE)
+                val dateIdx = cursor.getColumnIndex(CallLog.Calls.DATE)
+                val durIdx = cursor.getColumnIndex(CallLog.Calls.DURATION)
+
+                while (cursor.moveToNext()) {
+                    val id = if (idIdx != -1) cursor.getLong(idIdx) else 0L
+                    val number = if (numIdx != -1) cursor.getString(numIdx) ?: phoneNumber else phoneNumber
+                    val typeInt = if (typeIdx != -1) cursor.getInt(typeIdx) else CallLog.Calls.INCOMING_TYPE
+                    val date = if (dateIdx != -1) cursor.getLong(dateIdx) else 0L
+                    val duration = if (durIdx != -1) cursor.getLong(durIdx) else 0L
+
+                    val callType = when (typeInt) {
+                        CallLog.Calls.INCOMING_TYPE -> CallType.INCOMING
+                        CallLog.Calls.OUTGOING_TYPE -> CallType.OUTGOING
+                        CallLog.Calls.MISSED_TYPE -> CallType.MISSED
+                        CallLog.Calls.REJECTED_TYPE -> CallType.REJECTED
+                        else -> CallType.UNKNOWN
+                    }
+
+                    result.add(
+                        CallLogItem(
+                            id = id,
+                            number = number,
+                            type = callType,
+                            timestamp = date,
+                            durationSeconds = duration
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading call logs for number $phoneNumber", e)
+        }
+        result
     }
 
     private fun fillMissingAddresses(conversationsMap: MutableMap<Long, SmsConversationBuilder>) {
@@ -250,73 +321,85 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
 
     private fun loadMessagesForThreadInternal(threadId: Long): List<SmsMessage> {
         val messages = ArrayList<SmsMessage>()
-        val projection = arrayOf(
-            Telephony.Sms._ID,
-            Telephony.Sms.THREAD_ID,
-            Telephony.Sms.ADDRESS,
-            Telephony.Sms.BODY,
-            Telephony.Sms.DATE,
-            Telephony.Sms.READ,
-            Telephony.Sms.TYPE
+        val urisToTry = listOf(
+            Telephony.Sms.CONTENT_URI,
+            Uri.parse("content://sms/inbox"),
+            Uri.parse("content://sms/sent"),
+            Uri.parse("content://sms")
         )
 
-        try {
-            contentResolver.query(
-                Telephony.Sms.CONTENT_URI,
-                projection,
-                "${Telephony.Sms.THREAD_ID} = ?",
-                arrayOf(threadId.toString()),
-                "${Telephony.Sms.DATE} ASC"
-            )?.use { cursor ->
-                val idIdx = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
-                val addressIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
-                val bodyIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                val dateIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
-                val readIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.READ)
-                val typeIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE)
-
-                var contactNameCached: String? = null
-                var firstAddress = ""
-
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idIdx)
-                    val address = cursor.getString(addressIdx) ?: ""
-                    if (contactNameCached == null && address.isNotBlank()) {
-                        firstAddress = address
-                        contactNameCached = resolveContactNameSync(address)
-                    }
-                    val body = cursor.getString(bodyIdx) ?: ""
-                    val timestamp = cursor.getLong(dateIdx)
-                    val isRead = cursor.getInt(readIdx) == 1
-                    val typeInt = cursor.getInt(typeIdx)
-
-                    val type = when (typeInt) {
-                        Telephony.Sms.MESSAGE_TYPE_INBOX -> MessageBoxType.INBOX
-                        Telephony.Sms.MESSAGE_TYPE_SENT -> MessageBoxType.SENT
-                        Telephony.Sms.MESSAGE_TYPE_OUTBOX -> MessageBoxType.OUTBOX
-                        Telephony.Sms.MESSAGE_TYPE_FAILED -> MessageBoxType.FAILED
-                        else -> MessageBoxType.UNKNOWN
-                    }
-
-                    messages.add(
-                        SmsMessage(
-                            id = id,
-                            threadId = threadId,
-                            address = if (address.isBlank()) firstAddress else address,
-                            contactName = contactNameCached,
-                            body = body,
-                            timestamp = timestamp,
-                            isRead = isRead,
-                            boxType = type
-                        )
-                    )
+        for (uri in urisToTry) {
+            try {
+                contentResolver.query(
+                    uri,
+                    null,
+                    "${Telephony.Sms.THREAD_ID} = ?",
+                    arrayOf(threadId.toString()),
+                    "${Telephony.Sms.DATE} ASC"
+                )?.use { cursor ->
+                    parseMessagesFromCursor(cursor, threadId, messages)
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading messages for thread $threadId from $uri", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error loading messages for thread", e)
+
+            if (messages.isNotEmpty()) break
         }
 
         return messages
+    }
+
+    private fun parseMessagesFromCursor(
+        cursor: android.database.Cursor,
+        threadId: Long,
+        messages: MutableList<SmsMessage>
+    ) {
+        val idIdx = cursor.getColumnIndex(Telephony.Sms._ID)
+        val addressIdx = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
+        val bodyIdx = cursor.getColumnIndex(Telephony.Sms.BODY)
+        val dateIdx = cursor.getColumnIndex(Telephony.Sms.DATE)
+        val readIdx = cursor.getColumnIndex(Telephony.Sms.READ)
+        val typeIdx = cursor.getColumnIndex(Telephony.Sms.TYPE)
+
+        var contactNameCached: String? = null
+        var firstAddress = ""
+        val seenIds = mutableSetOf<Long>()
+
+        while (cursor.moveToNext()) {
+            val id = if (idIdx != -1) cursor.getLong(idIdx) else 0L
+            if (id > 0 && !seenIds.add(id)) continue
+
+            val address = if (addressIdx != -1) cursor.getString(addressIdx) ?: "" else ""
+            if (contactNameCached == null && address.isNotBlank()) {
+                firstAddress = address
+                contactNameCached = resolveContactNameSync(address)
+            }
+            val body = if (bodyIdx != -1) cursor.getString(bodyIdx) ?: "" else ""
+            val timestamp = if (dateIdx != -1) cursor.getLong(dateIdx) else 0L
+            val isRead = if (readIdx != -1) cursor.getInt(readIdx) == 1 else true
+            val typeInt = if (typeIdx != -1) cursor.getInt(typeIdx) else Telephony.Sms.MESSAGE_TYPE_INBOX
+
+            val type = when (typeInt) {
+                Telephony.Sms.MESSAGE_TYPE_INBOX -> MessageBoxType.INBOX
+                Telephony.Sms.MESSAGE_TYPE_SENT -> MessageBoxType.SENT
+                Telephony.Sms.MESSAGE_TYPE_OUTBOX -> MessageBoxType.OUTBOX
+                Telephony.Sms.MESSAGE_TYPE_FAILED -> MessageBoxType.FAILED
+                else -> MessageBoxType.UNKNOWN
+            }
+
+            messages.add(
+                SmsMessage(
+                    id = id,
+                    threadId = threadId,
+                    address = if (address.isBlank()) firstAddress else address,
+                    contactName = contactNameCached,
+                    body = body,
+                    timestamp = timestamp,
+                    isRead = isRead,
+                    boxType = type
+                )
+            )
+        }
     }
 
     override suspend fun sendSms(recipient: String, body: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -471,51 +554,7 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     }
 
     override suspend fun getAllContacts(): List<ContactItem> = withContext(Dispatchers.IO) {
-        val contactsList = mutableListOf<ContactItem>()
-        try {
-            val projection = arrayOf(
-                ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.NUMBER,
-                ContactsContract.CommonDataKinds.Phone.PHOTO_URI
-            )
-            contentResolver.query(
-                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                projection,
-                null,
-                null,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
-            )?.use { cursor ->
-                val idIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
-                val nameIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-                val numberIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                val photoIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
-
-                val seenNumbers = mutableSetOf<String>()
-
-                while (cursor.moveToNext()) {
-                    val id = if (idIdx != -1) cursor.getLong(idIdx) else 0L
-                    val name = if (nameIdx != -1) cursor.getString(nameIdx) ?: "Unknown" else "Unknown"
-                    val rawNumber = if (numberIdx != -1) cursor.getString(numberIdx) ?: "Unknown" else "Unknown"
-                    val photoUri = if (photoIdx != -1) cursor.getString(photoIdx) else null
-
-                    val cleanNumber = rawNumber.replace("\\s+".toRegex(), "")
-                    if (cleanNumber.isNotBlank() && seenNumbers.add(cleanNumber)) {
-                        contactsList.add(
-                            ContactItem(
-                                id = id,
-                                name = name,
-                                number = cleanNumber,
-                                photoUri = photoUri
-                            )
-                        )
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error fetching contacts", e)
-        }
-        contactsList
+        ContactManager.getAllContacts(context)
     }
 
     private class SmsConversationBuilder(
