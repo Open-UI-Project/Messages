@@ -14,7 +14,19 @@
     <string name="about_title">Messages</string>
     <string name="about_subtitle_prefix">An application from the </string>
     <string name="about_subtitle_project">Open UI Project</string>
-    <string name="about_badge">v1.0.0 • Open Source</string>
+    <string name="about_badge">v2.0.0 • Open Source</string>
+    <string name="settings_title">Settings</string>
+    <string name="ghost_mode_title">Ghost Mode</string>
+    <string name="ghost_mode_subtitle">Read messages without marking them as read</string>
+    <string name="ghost_mode_learn_more">Learn more</string>
+    <string name="ghost_mode_desc">When Ghost Mode is enabled, you can safely read all incoming SMS messages without marking them as read. Senders will not receive read receipts, and chats will retain their unread indicators so nobody knows you opened them.</string>
+    <string name="wallpaper_title">App Wallpaper</string>
+    <string name="wallpaper_subtitle">Set photo, video, or GIF as background across the entire app</string>
+    <string name="wallpaper_choose_btn">Choose Media / Crop</string>
+    <string name="wallpaper_active_label">Custom Wallpaper</string>
+    <string name="wallpaper_remove_btn">Remove Wallpaper</string>
+    <string name="wallpaper_removed_toast">Wallpaper removed</string>
+    <string name="wallpaper_set_toast">Wallpaper set successfully</string>
     <string name="about_description_p1">Our goal is to create a free, open, and modern messaging app inspired by the convenience of One UI, but without proprietary restrictions.</string>
     <string name="about_description_p2">The application is open source, completely free of telemetry and data collection, and developed transparently together with the community. You are welcome to contribute!</string>
     <string name="about_description_p3">Messages — freedom, openness, and convenience in one app. 💙</string>
@@ -113,7 +125,7 @@
     <!-- About Dialog -->
     <string name="about_app_name">Contacts</string>
     <string name="about_subtitle">An Open UI Project App</string>
-    <string name="about_version_tag">v1.0.0 • Open Source</string>
+    <string name="about_version_tag">v2.0.0 • Open Source</string>
     <string name="about_goal">Our goal is to create a free, modern, open-source contacts application inspired by the elegance of One UI, without proprietary limitations.</string>
     <string name="about_privacy">The app is open-source, completely free of telemetry and data tracking, and developed transparently with the community. Join development!</string>
     <string name="about_tagline">Contacts — freedom, openness, and convenience in one app. 💙</string>
@@ -163,6 +175,7 @@
     <string name="contact_unknown">Unknown</string>
     <string name="perm_required_title">Need SMS permissions</string>
     <string name="perm_required_desc">To display your messages and contacts, please grant the required permissions.</string>
+    <string name="contacts_manage_change">Change</string>
     <string name="perm_grant_btn">Grant access</string>
     <string name="perm_settings_btn">Open app settings</string>
 </resources>

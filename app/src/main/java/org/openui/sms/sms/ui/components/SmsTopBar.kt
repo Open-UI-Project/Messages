@@ -1,5 +1,14 @@
 package org.openui.sms.sms.ui.components
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -30,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,10 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.stringResource
 import org.openui.sms.R
 import org.openui.sms.sms.ui.SmsGroup
 import org.openui.sms.ui.theme.OpenUICardBackground
@@ -59,11 +69,23 @@ fun SmsTopBar(
     onSearchQueryChange: (String) -> Unit,
     onMarkAllAsReadClick: () -> Unit,
     onMakeDefaultAppClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var isSearchActive by remember { mutableStateOf(false) }
+    var isSearchActive by remember { mutableStateOf(searchQuery.isNotEmpty()) }
     var showMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotEmpty()) {
+            isSearchActive = true
+        }
+    }
+
+    BackHandler(enabled = isSearchActive || searchQuery.isNotEmpty()) {
+        isSearchActive = false
+        onSearchQueryChange("")
+    }
 
     Column(
         modifier = modifier
@@ -71,152 +93,197 @@ fun SmsTopBar(
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(top = 12.dp, bottom = 4.dp)
     ) {
-        if (isSearchActive) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = {
-                        Text(
-                            text = stringResource(R.string.search_messages),
-                            color = OpenUITextSecondary,
-                            fontSize = 15.sp
-                        )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(20.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = OpenUIOrangeBadge,
-                        unfocusedBorderColor = OpenUICardBackground,
-                        focusedContainerColor = OpenUICardBackground,
-                        unfocusedContainerColor = OpenUICardBackground
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-
-                IconButton(
-                    onClick = {
-                        isSearchActive = false
-                        onSearchQueryChange("")
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = null,
-                        tint = Color.White
+        AnimatedContent(
+            targetState = isSearchActive,
+            transitionSpec = {
+                if (targetState) {
+                    (slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth / 3 },
+                        animationSpec = tween(280, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(280))).togetherWith(
+                        slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> -fullWidth / 4 },
+                            animationSpec = tween(220, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(180))
+                    )
+                } else {
+                    (slideInHorizontally(
+                        initialOffsetX = { fullWidth -> -fullWidth / 4 },
+                        animationSpec = tween(280, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(280))).togetherWith(
+                        slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> fullWidth / 3 },
+                            animationSpec = tween(220, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(180))
                     )
                 }
-            }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            },
+            label = "SmsTopBarSearchTransition"
+        ) { active ->
+            if (active) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState())
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val defaultGroupName = stringResource(R.string.all_groups)
-                    val allGroups = listOf(defaultGroupName) + groups.map { it.name }
-                    allGroups.forEach { groupName ->
-                        val isSelected = groupName == selectedGroup
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = {
+                            Text(
+                                text = stringResource(R.string.search_messages),
+                                color = OpenUITextSecondary,
+                                fontSize = 15.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = null,
+                                tint = OpenUIOrangeBadge,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = OpenUIOrangeBadge,
+                            unfocusedBorderColor = OpenUICardBackground,
+                            focusedContainerColor = OpenUICardBackground,
+                            unfocusedContainerColor = OpenUICardBackground
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    IconButton(
+                        onClick = {
+                            isSearchActive = false
+                            onSearchQueryChange("")
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.group_cancel),
+                            tint = Color.White
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .horizontalScroll(rememberScrollState())
+                    ) {
+                        val defaultGroupName = stringResource(R.string.all_groups)
+                        val allGroups = listOf(defaultGroupName) + groups.map { it.name }
+                        allGroups.forEach { groupName ->
+                            val isSelected = groupName == selectedGroup
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSelected) OpenUIPillBackground else Color.Transparent)
+                                    .clickable { onGroupSelect(groupName) }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = groupName,
+                                    color = if (isSelected) Color.White else OpenUITextSecondary,
+                                    fontSize = 16.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(if (isSelected) OpenUIPillBackground else Color.Transparent)
-                                .clickable { onGroupSelect(groupName) }
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                                .background(OpenUICardBackground)
+                                .clickable { onCreateGroupClick() }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = groupName,
-                                color = if (isSelected) Color.White else OpenUITextSecondary,
-                                fontSize = 16.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = stringResource(R.string.add_group),
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
                     }
 
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(OpenUICardBackground)
-                            .clickable { onCreateGroupClick() }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = stringResource(R.string.add_group),
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { isSearchActive = true }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Search,
-                            contentDescription = stringResource(R.string.search),
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { isSearchActive = true }) {
                             Icon(
-                                imageVector = Icons.Rounded.MoreVert,
-                                contentDescription = stringResource(R.string.menu),
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = stringResource(R.string.search),
                                 tint = Color.White,
                                 modifier = Modifier.size(26.dp)
                             )
                         }
 
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                            modifier = Modifier.background(OpenUICardBackground)
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.read_all), color = Color.White) },
-                                onClick = {
-                                    showMenu = false
-                                    onMarkAllAsReadClick()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.make_default_app), color = Color.White) },
-                                onClick = {
-                                    showMenu = false
-                                    onMakeDefaultAppClick()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.about_app), color = Color.White) },
-                                onClick = {
-                                    showMenu = false
-                                    onAboutClick()
-                                }
-                            )
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.MoreVert,
+                                    contentDescription = stringResource(R.string.menu),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false },
+                                modifier = Modifier.background(OpenUICardBackground)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.read_all), color = Color.White) },
+                                    onClick = {
+                                        showMenu = false
+                                        onMarkAllAsReadClick()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.make_default_app), color = Color.White) },
+                                    onClick = {
+                                        showMenu = false
+                                        onMakeDefaultAppClick()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.settings_title), color = Color.White) },
+                                    onClick = {
+                                        showMenu = false
+                                        onSettingsClick()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.about_app), color = Color.White) },
+                                    onClick = {
+                                        showMenu = false
+                                        onAboutClick()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -224,4 +291,3 @@ fun SmsTopBar(
         }
     }
 }
-

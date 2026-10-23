@@ -14,7 +14,20 @@
     <string name="about_title">Сообщения</string>
     <string name="about_subtitle_prefix">Приложение от </string>
     <string name="about_subtitle_project">Open UI Project</string>
-    <string name="about_badge">v1.0.0 • Открытый исходный код</string>
+    <string name="about_badge">v2.0.0 • Открытый исходный код</string>
+    <string name="settings_title">Настройки</string>
+    <string name="ghost_mode_title">Режим Призрака</string>
+    <string name="ghost_mode_subtitle">Чтение сообщений без отметки о прочтении</string>
+    <string name="ghost_mode_learn_more">Подробнее о режиме</string>
+    <string name="ghost_mode_desc">В режиме призрака вы можете спокойно читать любые входящие SMS-сообщения, и они не будут помечаться прочитанными. Собеседник не увидит отчёт о прочтении, а в чатах не будет видно, что вы их прочитали.</string>
+    <string name="wallpaper_title">Обои приложения</string>
+    <string name="wallpaper_subtitle">Установить фото, видео или GIF фоном для всего приложения</string>
+    <string name="wallpaper_choose_btn">Выбрать медиа / фрагмент</string>
+    <string name="wallpaper_active_label">Установленные обои</string>
+    <string name="wallpaper_remove_btn">Отключить обои</string>
+    <string name="wallpaper_removed_toast">Обои отключены</string>
+    <string name="wallpaper_set_toast">Обои успешно установлены</string>
+    <string name="contacts_manage_change">Изменить</string>
     <string name="about_description_p1">Наша цель — создать бесплатное, открытое и современное приложение для обмена сообщениями, вдохновлённое удобством One UI, но без проприетарных ограничений.</string>
     <string name="about_description_p2">Приложение имеет открытый исходный код, полностью лишено телеметрии и сбора данных, и разрабатывается прозрачно вместе с сообществом. Присоединяйтесь к разработке!</string>
     <string name="about_description_p3">Сообщения — свобода, открытость и удобство в одном приложении. 💙</string>
@@ -113,7 +126,7 @@
     <!-- About Dialog -->
     <string name="about_app_name">Контакты</string>
     <string name="about_subtitle">Приложение от Open UI Project</string>
-    <string name="about_version_tag">v1.0.0 • Открытый исходный код</string>
+    <string name="about_version_tag">v2.0.0 • Открытый исходный код</string>
     <string name="about_goal">Наша цель — создать бесплатное, открытое и современное приложение для управления контактами, вдохновлённое удобством One UI, но без проприетарных ограничений.</string>
     <string name="about_privacy">Приложение имеет открытый исходный код, полностью лишено телеметрии и сбора данных, и разрабатывается прозрачно вместе с сообществом. Присоединяйтесь к разработке!</string>
     <string name="about_tagline">Контакты — свобода, открытость и удобство в одном приложении. 💙</string>

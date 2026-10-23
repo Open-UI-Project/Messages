@@ -35,7 +35,6 @@ class ContactPreferences(private val context: Context) {
     }
 
     private fun getSharedString(key: String, defaultValue: String?): String? {
-        // 1. Try reading from Open UI Contacts app provider if installed
         try {
             val uri = Uri.parse(CONTACTS_PROVIDER_URI)
             val res = context.contentResolver.call(uri, METHOD_GET_PREF, key, null)
@@ -43,10 +42,8 @@ class ContactPreferences(private val context: Context) {
                 return res.getString(KEY_PREF_VALUE) ?: defaultValue
             }
         } catch (_: Exception) {
-            // Contacts app not installed or provider not accessible
         }
 
-        // 2. Try reading from other package Context if shared userId / signature allows
         try {
             val otherContext = context.createPackageContext(CONTACTS_APP_PKG, Context.CONTEXT_IGNORE_SECURITY)
             val otherPrefs = otherContext.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)
@@ -54,22 +51,18 @@ class ContactPreferences(private val context: Context) {
                 return otherPrefs.getString(key, defaultValue)
             }
         } catch (_: Exception) {
-            // Not installed or secure
         }
 
-        // 3. Fallback to local SharedPreferences
         return localPrefs.getString(key, defaultValue)
     }
 
     private fun putSharedString(key: String, value: String?) {
-        // 1. Write to local
         if (value == null) {
             localPrefs.edit().remove(key).apply()
         } else {
             localPrefs.edit().putString(key, value).apply()
         }
 
-        // 2. Push to Open UI Contacts app provider if available
         try {
             val uri = Uri.parse(CONTACTS_PROVIDER_URI)
             val extras = Bundle().apply {
@@ -82,10 +75,8 @@ class ContactPreferences(private val context: Context) {
                 context.contentResolver.call(uri, METHOD_SET_PREF, key, extras)
             }
         } catch (_: Exception) {
-            // Contacts app not active
         }
 
-        // 3. Push to other package context if accessible
         try {
             val otherContext = context.createPackageContext(CONTACTS_APP_PKG, Context.CONTEXT_IGNORE_SECURITY)
             val otherPrefs = otherContext.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)
@@ -95,12 +86,10 @@ class ContactPreferences(private val context: Context) {
                 otherPrefs.edit().putString(key, value).apply()
             }
         } catch (_: Exception) {
-            // Ignore
         }
     }
 
     private fun getSharedStringSet(key: String): Set<String> {
-        // 1. Try reading from Open UI Contacts app provider
         try {
             val uri = Uri.parse(CONTACTS_PROVIDER_URI)
             val res = context.contentResolver.call(uri, METHOD_GET_PREF, key, null)
@@ -111,7 +100,6 @@ class ContactPreferences(private val context: Context) {
         } catch (_: Exception) {
         }
 
-        // 2. Try reading from other package Context
         try {
             val otherContext = context.createPackageContext(CONTACTS_APP_PKG, Context.CONTEXT_IGNORE_SECURITY)
             val otherPrefs = otherContext.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)

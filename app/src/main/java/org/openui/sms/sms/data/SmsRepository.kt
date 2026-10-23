@@ -449,6 +449,9 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     }
 
     override suspend fun markThreadAsRead(threadId: Long): Boolean = withContext(Dispatchers.IO) {
+        if (org.openui.sms.data.AppSettings.getInstance(context).isGhostMode()) {
+            return@withContext false
+        }
         try {
             val values = ContentValues().apply {
                 put(Telephony.Sms.READ, 1)
@@ -470,6 +473,9 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     }
 
     override suspend fun markAllAsRead(): Boolean = withContext(Dispatchers.IO) {
+        if (org.openui.sms.data.AppSettings.getInstance(context).isGhostMode()) {
+            return@withContext false
+        }
         try {
             val values = ContentValues().apply {
                 put(Telephony.Sms.READ, 1)

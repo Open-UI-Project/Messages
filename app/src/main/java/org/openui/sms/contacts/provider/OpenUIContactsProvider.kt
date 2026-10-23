@@ -28,7 +28,7 @@ class OpenUIContactsProvider : ContentProvider() {
 
         const val KEY_PREF_KEY = "key"
         const val KEY_PREF_VALUE = "value"
-        const val KEY_PREF_TYPE = "type" // string, string_set, etc.
+        const val KEY_PREF_TYPE = "type"
     }
 
     private var prefs: SharedPreferences? = null

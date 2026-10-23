@@ -2,6 +2,7 @@ package org.openui.sms.contacts.data
 
 import android.Manifest
 import android.content.ContentProviderOperation
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -43,10 +44,10 @@ object ContactManager {
                     for (sub in activeSubs) {
                         val carrier = sub.carrierName?.toString()?.trim() ?: ""
                         val display = sub.displayName?.toString()?.trim() ?: ""
-                        
+
                         val isCarrierGeneric = carrier.equals("Android", ignoreCase = true) || carrier.equals("T-Mobile", ignoreCase = true)
                         val isDisplayGeneric = display.equals("Android", ignoreCase = true) || display.equals("T-Mobile", ignoreCase = true)
-                        
+
                         val cleanCarrier = if (isCarrierGeneric) "" else carrier
                         val cleanDisplay = if (isDisplayGeneric) "" else display
 
@@ -76,6 +77,73 @@ object ContactManager {
         return simList
     }
 
+    private fun fetchSimContacts(context: Context): List<ContactItem> {
+        val simContacts = mutableListOf<ContactItem>()
+        val simUris = mutableListOf<Pair<Uri, String>>()
+
+        try {
+            val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            val activeSubs = subManager?.activeSubscriptionInfoList
+            if (!activeSubs.isNullOrEmpty()) {
+                for (sub in activeSubs) {
+                    val subId = sub.subscriptionId
+                    val uri = Uri.parse("content://icc/adn/subId/$subId")
+                    val label = if (sub.displayName.isNullOrBlank()) "SIM ${sub.simSlotIndex + 1}" else sub.displayName.toString()
+                    simUris.add(uri to label)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        if (simUris.isEmpty()) {
+            simUris.add(Uri.parse("content://icc/adn") to "SIM")
+            simUris.add(Uri.parse("content://sim/adn") to "SIM")
+        } else {
+            simUris.add(Uri.parse("content://icc/adn") to "SIM")
+        }
+
+        val seenSimNumbers = mutableSetOf<String>()
+
+        for ((uri, label) in simUris) {
+            try {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex("name").takeIf { it >= 0 }
+                        ?: cursor.getColumnIndex("tag")
+                    val numberIdx = cursor.getColumnIndex("number")
+                    val idIdx = cursor.getColumnIndex("_id")
+
+                    while (cursor.moveToNext()) {
+                        val rawName = if (nameIdx >= 0) cursor.getString(nameIdx) ?: "" else ""
+                        val rawNumber = if (numberIdx >= 0) cursor.getString(numberIdx) ?: "" else ""
+                        val simContactId = if (idIdx >= 0) cursor.getLong(idIdx) else 0L
+
+                        val clean = rawNumber.replace("[^0-9+]".toRegex(), "")
+                        if (clean.isNotBlank() && seenSimNumbers.add(clean)) {
+                            val contactName = rawName.trim().ifBlank { rawNumber.trim() }
+                            val syntheticId = 900_000_000L + (uri.hashCode().toLong() and 0xFFFFL) * 1000L + (simContactId and 0x3FFL)
+
+                            simContacts.add(
+                                ContactItem(
+                                    id = syntheticId,
+                                    name = contactName,
+                                    number = rawNumber.trim(),
+                                    email = null,
+                                    photoUri = null,
+                                    phoneType = "SIM",
+                                    accountType = "SIM ($label)"
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        return simContacts
+    }
+
     suspend fun saveContact(
         context: Context,
         name: String,
@@ -87,13 +155,43 @@ object ContactManager {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             return@withContext false
         }
+
+        var simSaved = false
+
+        if (storageTarget.startsWith("SIM", ignoreCase = true)) {
+            try {
+                val simAccounts = getAvailableSimAccounts(context)
+                val slotIndex = storageTarget.removePrefix("SIM").trim().toIntOrNull()?.minus(1) ?: 0
+                val targetAccount = simAccounts.find { it.slotIndex == slotIndex } ?: simAccounts.firstOrNull()
+                val subId = targetAccount?.simId
+
+                val targetSimUri = if (subId != null && subId > 0) {
+                    Uri.parse("content://icc/adn/subId/$subId")
+                } else {
+                    Uri.parse("content://icc/adn")
+                }
+
+                val simValues = ContentValues().apply {
+                    put("tag", name)
+                    put("number", phone)
+                }
+
+                val insertedSim = context.contentResolver.insert(targetSimUri, simValues)
+                if (insertedSim != null) {
+                    simSaved = true
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
         return@withContext try {
             val ops = ArrayList<ContentProviderOperation>()
 
             var accountType: String? = null
             var accountName: String? = null
 
-            if (storageTarget.startsWith("SIM")) {
+            if (storageTarget.startsWith("SIM", ignoreCase = true)) {
                 accountType = "com.android.sim"
                 accountName = storageTarget
             }
@@ -160,7 +258,7 @@ object ContactManager {
             true
         } catch (e: Exception) {
             e.printStackTrace()
-            false
+            simSaved
         }
     }
 
@@ -307,6 +405,8 @@ object ContactManager {
             ContactsContract.CommonDataKinds.Phone.ACCOUNT_TYPE_AND_DATA_SET
         )
 
+        val seenNumbers = mutableSetOf<String>()
+
         try {
             contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -321,8 +421,6 @@ object ContactManager {
                 val photoIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
                 val typeIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
                 val accountTypeIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.ACCOUNT_TYPE_AND_DATA_SET)
-
-                val seenNumbers = mutableSetOf<String>()
 
                 while (cursor.moveToNext()) {
                     val id = if (idIndex >= 0) cursor.getLong(idIndex) else 0L
@@ -353,7 +451,33 @@ object ContactManager {
             e.printStackTrace()
         }
 
-        return list
+        try {
+            val simContacts = fetchSimContacts(context)
+            for (simContact in simContacts) {
+                val clean = simContact.number.replace("[^0-9+]".toRegex(), "")
+                if (clean.isNotBlank()) {
+                    val existingIndex = list.indexOfFirst {
+                        val itClean = it.number.replace("[^0-9+]".toRegex(), "")
+                        itClean == clean || (clean.length >= 7 && itClean.endsWith(clean.takeLast(7)))
+                    }
+                    if (existingIndex == -1) {
+                        list.add(simContact)
+                    } else {
+                        val existing = list[existingIndex]
+                        if (existing.name == existing.number && simContact.name != simContact.number) {
+                            list[existingIndex] = existing.copy(
+                                name = simContact.name,
+                                accountType = simContact.accountType
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return list.sortedBy { it.name.lowercase() }
     }
 
     private fun fetchEmailForContact(context: Context, contactId: Long): String? {
@@ -385,7 +509,7 @@ object ContactManager {
         val cleanPhone = phone.replace("[^0-9+]".toRegex(), "")
 
         try {
-            if (contactId > 0) {
+            if (contactId > 0 && contactId < 900_000_000L) {
                 val contactUri = android.content.ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
                 val deletedRows = context.contentResolver.delete(contactUri, null, null)
                 if (deletedRows > 0) success = true
@@ -426,12 +550,15 @@ object ContactManager {
         }
 
         try {
-            val simUris = listOf(
-                Uri.parse("content://icc/adn"),
-                Uri.parse("content://sim/adn"),
-                Uri.parse("content://icc/adn/subId/1"),
-                Uri.parse("content://icc/adn/subId/2")
-            )
+            val simUris = mutableListOf<Uri>()
+            simUris.add(Uri.parse("content://icc/adn"))
+            simUris.add(Uri.parse("content://sim/adn"))
+
+            val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            subManager?.activeSubscriptionInfoList?.forEach { sub ->
+                simUris.add(Uri.parse("content://icc/adn/subId/${sub.subscriptionId}"))
+            }
+
             val cleanName = name.replace("'", "''")
             val cleanNum = cleanPhone.replace("'", "''")
             for (simUri in simUris) {

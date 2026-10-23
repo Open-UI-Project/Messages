@@ -58,6 +58,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,6 +100,10 @@ fun SmsThreadScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val appSettings = remember(context) { org.openui.sms.data.AppSettings.getInstance(context) }
+    val wallpaperUri by appSettings.wallpaperUri.collectAsState()
+    val isWallpaperActive = wallpaperUri != null
+
     val prefs = remember(context) { context.getSharedPreferences("sms_drafts", Context.MODE_PRIVATE) }
     val draftKey = remember(title) { "draft_${title.hashCode()}" }
 
@@ -152,7 +157,7 @@ fun SmsThreadScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(OpenUIBlack)
+            .background(if (isWallpaperActive) Color.Transparent else OpenUIBlack)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -160,7 +165,7 @@ fun SmsThreadScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(OpenUISurface)
+                .background(if (isWallpaperActive) OpenUISurface.copy(alpha = 0.88f) else OpenUISurface)
                 .padding(horizontal = 4.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -267,13 +272,13 @@ fun SmsThreadScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(OpenUISurface)
+                .background(if (isWallpaperActive) OpenUISurface.copy(alpha = 0.90f) else OpenUISurface)
         ) {
             AnimatedVisibility(visible = showEmojiPicker) {
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(OpenUISurface)
+                        .background(if (isWallpaperActive) OpenUISurface.copy(alpha = 0.90f) else OpenUISurface)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -293,7 +298,7 @@ fun SmsThreadScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(OpenUISurface)
+                        .background(if (isWallpaperActive) OpenUISurface.copy(alpha = 0.90f) else OpenUISurface)
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
@@ -330,7 +335,7 @@ fun SmsThreadScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(OpenUISurface)
+                    .background(if (isWallpaperActive) OpenUISurface.copy(alpha = 0.90f) else OpenUISurface)
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

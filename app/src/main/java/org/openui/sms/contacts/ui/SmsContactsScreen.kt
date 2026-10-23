@@ -13,13 +13,20 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import org.openui.sms.sms.ui.components.SettingsDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -135,6 +142,7 @@ fun SmsContactsScreen(
     var showFavoritesOnly by remember { mutableStateOf(false) }
     var showStorageDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     var trashVersion by remember { mutableStateOf(0) }
 
     var currentStorageTarget by remember { mutableStateOf(prefs.getStorageTarget()) }
@@ -315,13 +323,22 @@ fun SmsContactsScreen(
                         .padding(top = 16.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (showFavoritesOnly) stringResource(R.string.contacts_favorites_title) else stringResource(R.string.contacts_title),
-                        color = colors.textPrimary,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
+                    AnimatedContent(
+                        targetState = showFavoritesOnly,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(220)) + slideInHorizontally { width -> if (targetState) width / 4 else -width / 4 })
+                                .togetherWith(fadeOut(animationSpec = tween(180)) + slideOutHorizontally { width -> if (targetState) -width / 4 else width / 4 })
+                        },
+                        label = "contacts_title_anim",
                         modifier = Modifier.weight(1f)
-                    )
+                    ) { isFav ->
+                        Text(
+                            text = if (isFav) stringResource(R.string.contacts_favorites_title) else stringResource(R.string.contacts_title),
+                            color = colors.textPrimary,
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
                     IconButton(
                         onClick = {
@@ -399,6 +416,13 @@ fun SmsContactsScreen(
                                 }
                             )
                             DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings_title), color = colors.textPrimary, fontSize = 14.sp) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    showSettingsDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text(stringResource(R.string.contacts_about), color = colors.textPrimary, fontSize = 14.sp) },
                                 onClick = {
                                     isMenuExpanded = false
@@ -411,8 +435,8 @@ fun SmsContactsScreen(
 
                 AnimatedVisibility(
                     visible = isSearchVisible || searchQuery.isNotEmpty(),
-                    enter = fadeIn(animationSpec = tween(200)),
-                    exit = fadeOut(animationSpec = tween(200))
+                    enter = expandVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(260)),
+                    exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(180))
                 ) {
                     OutlinedTextField(
                         value = searchQuery,
@@ -552,7 +576,10 @@ fun SmsContactsScreen(
                                             .fillMaxWidth()
                                             .clip(ContactRowShape)
                                             .background(colors.card)
-                                            .clickable { showFavoritesOnly = true }
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = ripple(color = StarBadgeColor.copy(alpha = 0.2f))
+                                            ) { showFavoritesOnly = true }
                                             .padding(horizontal = 16.dp, vertical = 14.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -576,6 +603,45 @@ fun SmsContactsScreen(
                                             color = colors.textPrimary,
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (showFavoritesOnly) {
+                                item(key = "favorites_back_chip") {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(ContactRowShape)
+                                            .background(colors.card)
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = ripple(color = colors.textPrimary.copy(alpha = 0.08f))
+                                            ) { showFavoritesOnly = false }
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(CircleShape)
+                                                .background(colors.cardElevated),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Rounded.FormatListBulleted,
+                                                contentDescription = null,
+                                                tint = colors.dialerGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = stringResource(R.string.contacts_show_all),
+                                            color = colors.dialerGreen,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 }
@@ -659,12 +725,38 @@ fun SmsContactsScreen(
                                 modifier = Modifier.padding(top = 8.dp)
                             ) {
                                 val storageLabel = if (currentStorageTarget.startsWith("SIM")) currentStorageTarget else stringResource(R.string.contacts_storage_phone_title)
-                                Text(
-                                    text = stringResource(R.string.contacts_storage_saving_to, storageLabel),
-                                    color = colors.dialerGreen,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colors.cardElevated)
+                                        .clickable { showStorageDialog = true }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = if (currentStorageTarget.startsWith("SIM")) Icons.Rounded.SimCard else Icons.Rounded.Storage,
+                                            contentDescription = null,
+                                            tint = if (currentStorageTarget.startsWith("SIM")) colors.dialerGreen else colors.textPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = stringResource(R.string.contacts_storage_saving_to, storageLabel),
+                                            color = colors.textPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    Text(
+                                        text = stringResource(R.string.contacts_manage_change),
+                                        color = colors.dialerGreen,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 OutlinedTextField(
                                     value = newContactName,
                                     onValueChange = { newContactName = it },
@@ -701,13 +793,22 @@ fun SmsContactsScreen(
                                 onClick = {
                                     if (newContactName.isNotBlank() && newContactNumber.isNotBlank()) {
                                         showAddContactDialog = false
+                                        val targetToSave = currentStorageTarget
                                         coroutineScope.launch {
-                                            ContactManager.saveContact(
+                                            val saved = ContactManager.saveContact(
                                                 context = context,
                                                 name = newContactName.trim(),
                                                 phone = newContactNumber.trim(),
-                                                storageTarget = currentStorageTarget
+                                                storageTarget = targetToSave
                                             )
+                                            if (saved) {
+                                                val msg = if (targetToSave.startsWith("SIM")) {
+                                                    "Контакт успешно сохранён на $targetToSave"
+                                                } else {
+                                                    "Контакт успешно сохранён в память устройства"
+                                                }
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
                                             onRefresh()
                                         }
                                     }
@@ -738,6 +839,12 @@ fun SmsContactsScreen(
                             val label = if (selected.startsWith("SIM")) "SIM ($selected)" else context.getString(R.string.contacts_storage_phone_title)
                             Toast.makeText(context, context.getString(R.string.contacts_storage_selected_toast, label), Toast.LENGTH_SHORT).show()
                         }
+                    )
+                }
+
+                if (showSettingsDialog) {
+                    SettingsDialog(
+                        onDismissRequest = { showSettingsDialog = false }
                     )
                 }
 
@@ -986,124 +1093,124 @@ private fun ContactRowItem(
     val colors = AppTheme.colors
     val avatarColor = remember(contact.name) { getAvatarColor(contact.name) }
     val initial = contact.initials.ifBlank { "#" }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "chevron_rotation"
+    )
 
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .clip(ContactRowShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = colors.textPrimary.copy(alpha = 0.08f)),
                 onClick = onRowClick
             )
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
             .padding(horizontal = 18.dp, vertical = 14.dp)
             .testTag("contact_item_${contact.id}")
     ) {
-        if (!isExpanded) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(ContactCircleShape)
+                    .background(avatarColor),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(ContactCircleShape)
-                        .background(avatarColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (contact.photoUri != null) {
-                        AsyncImage(
-                            model = contact.photoUri,
-                            contentDescription = contact.name,
-                            modifier = Modifier.size(40.dp),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Text(
-                            text = initial,
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = contact.name,
-                        color = colors.textPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                if (contact.photoUri != null) {
+                    AsyncImage(
+                        model = contact.photoUri,
+                        contentDescription = contact.name,
+                        modifier = Modifier.size(42.dp),
+                        contentScale = ContentScale.Crop
                     )
-                    if (contact.email != null) {
-                        Text(
-                            text = contact.email,
-                            color = colors.textSecondary,
-                            fontSize = 12.sp
-                        )
-                    }
+                } else {
+                    Text(
+                        text = initial,
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
-        } else {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = contact.name,
-                            color = colors.textPrimary,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.contacts_mobile_prefix, contact.number),
-                            color = colors.textSecondary,
-                            fontSize = 13.sp
-                        )
-                        if (contact.email != null) {
-                            Text(
-                                text = contact.email,
-                                color = colors.primaryBrand,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(ContactCircleShape)
-                            .background(avatarColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (contact.photoUri != null) {
-                            AsyncImage(
-                                model = contact.photoUri,
-                                contentDescription = contact.name,
-                                modifier = Modifier.size(44.dp),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Text(
-                                text = initial,
-                                color = Color.White,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = contact.name,
+                    color = colors.textPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.contacts_mobile_prefix, contact.number),
+                    color = colors.textSecondary,
+                    fontSize = 13.sp
+                )
+                if (contact.email != null) {
+                    Text(
+                        text = contact.email,
+                        color = colors.primaryBrand,
+                        fontSize = 12.sp
+                    )
                 }
-                Spacer(modifier = Modifier.height(18.dp))
+            }
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                tint = colors.textMuted,
+                modifier = Modifier
+                    .size(22.dp)
+                    .rotate(chevronRotation)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(animationSpec = tween(200)),
+            exit = shrinkVertically(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeOut(animationSpec = tween(150))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            ) {
+                HorizontalDivider(
+                    color = colors.divider,
+                    thickness = 0.5.dp,
+                    modifier = Modifier.padding(bottom = 14.dp)
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-
                     Box(
                         modifier = Modifier
                             .size(48.dp)

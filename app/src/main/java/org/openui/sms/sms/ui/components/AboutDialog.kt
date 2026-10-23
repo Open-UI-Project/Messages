@@ -285,7 +285,6 @@ fun AboutDialog(
                     }
                 }
                 
-                // Top-right close button (rendered after Column so it's on top and clickable)
                 Box(
                     modifier = Modifier
                         .size(32.dp)

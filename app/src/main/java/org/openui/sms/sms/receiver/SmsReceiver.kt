@@ -4,45 +4,85 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.content.ContentValues
 import android.provider.Telephony
 import androidx.core.app.NotificationCompat
 import org.openui.sms.MainActivity
-import org.openui.sms.R
+import java.util.concurrent.ConcurrentHashMap
 
 class SmsReceiver : BroadcastReceiver() {
 
-    override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action
-        if (action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION || action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
-            val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-            if (!messages.isNullOrEmpty()) {
-                val sender = messages[0].displayOriginatingAddress ?: "SMS"
-                val body = messages.joinToString("") { it.displayMessageBody ?: "" }
-                val timestamp = messages[0].timestampMillis
+    companion object {
+        private val recentMessages = ConcurrentHashMap<String, Long>()
+        private const val DEDUPLICATION_WINDOW_MS = 6000L
+    }
 
-                if (action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
-                    saveMessageToProvider(context, sender, body, timestamp)
-                    showNotification(context, sender, body)
-                } else {
-                    val isDefault = context.packageName == Telephony.Sms.getDefaultSmsPackage(context)
-                    if (!isDefault) {
-                        showNotification(context, sender, body)
-                    }
-                }
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action ?: return
+        if (action != Telephony.Sms.Intents.SMS_DELIVER_ACTION &&
+            action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+            return
+        }
+
+        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+        if (messages.isNullOrEmpty()) return
+
+        val sender = messages[0].displayOriginatingAddress ?: "SMS"
+        val body = messages.joinToString("") { it.displayMessageBody ?: "" }
+        val timestamp = messages[0].timestampMillis
+
+        val now = System.currentTimeMillis()
+        val deduplicationKey = "${sender.trim()}:${body.trim()}"
+        val lastReceived = recentMessages[deduplicationKey]
+
+        if (recentMessages.size > 100) {
+            recentMessages.entries.removeIf { now - it.value > 60_000L }
+        }
+
+        if (lastReceived != null && (now - lastReceived) < DEDUPLICATION_WINDOW_MS) {
+            return
+        }
+        recentMessages[deduplicationKey] = now
+
+        val isDefault = context.packageName == Telephony.Sms.getDefaultSmsPackage(context)
+
+        if (action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
+            saveMessageToProvider(context, sender, body, timestamp)
+            showNotification(context, sender, body)
+        } else if (action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+            if (!isDefault) {
+                showNotification(context, sender, body)
             }
         }
     }
 
     private fun saveMessageToProvider(context: Context, sender: String, body: String, timestamp: Long) {
         try {
+            val now = if (timestamp > 0) timestamp else System.currentTimeMillis()
+
+            try {
+                val checkCursor = context.contentResolver.query(
+                    Telephony.Sms.Inbox.CONTENT_URI,
+                    arrayOf(Telephony.Sms._ID),
+                    "${Telephony.Sms.ADDRESS} = ? AND ${Telephony.Sms.BODY} = ? AND ${Telephony.Sms.DATE} >= ?",
+                    arrayOf(sender, body, (now - 15_000L).toString()),
+                    null
+                )
+                val exists = (checkCursor?.count ?: 0) > 0
+                checkCursor?.close()
+                if (exists) {
+                    return
+                }
+            } catch (_: Exception) {
+            }
+
             val values = ContentValues().apply {
                 put(Telephony.Sms.ADDRESS, sender)
                 put(Telephony.Sms.BODY, body)
-                put(Telephony.Sms.DATE, if (timestamp > 0) timestamp else System.currentTimeMillis())
+                put(Telephony.Sms.DATE, now)
                 put(Telephony.Sms.READ, 0)
                 put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX)
             }
@@ -59,10 +99,9 @@ class SmsReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "SMS Уведомления",
+                "SMS",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Канал для входящих SMS-сообщений"
                 enableVibration(true)
             }
             notificationManager.createNotificationChannel(channel)
@@ -90,6 +129,7 @@ class SmsReceiver : BroadcastReceiver() {
             .setContentIntent(pendingIntent)
             .build()
 
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        val notifId = (sender.hashCode() * 31 + body.hashCode()) and 0x7FFFFFFF
+        notificationManager.notify(notifId, notification)
     }
 }
