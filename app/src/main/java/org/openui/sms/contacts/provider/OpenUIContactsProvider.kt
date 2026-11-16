@@ -10,8 +10,10 @@ import android.net.Uri
 import android.os.Bundle
 
 /**
- * OpenUIContactsProvider allows shared ecosystem state between Open UI Contacts (org.openui.contacts)
- * and Open UI SMS (org.openui.sms), when installed on the same device and signed with the same key.
+ * Internal store for contact preferences used by Open UI Messages.
+ *
+ * The provider is intentionally not exported: its data stays inside the app
+ * sandbox and is never exposed to other applications on the device.
  */
 class OpenUIContactsProvider : ContentProvider() {
 

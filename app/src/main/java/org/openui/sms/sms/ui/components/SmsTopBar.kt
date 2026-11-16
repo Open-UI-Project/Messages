@@ -54,10 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.openui.sms.R
 import org.openui.sms.sms.ui.SmsGroup
-import org.openui.sms.ui.theme.OpenUICardBackground
+import org.openui.sms.ui.theme.AppTheme
 import org.openui.sms.ui.theme.OpenUIOrangeBadge
-import org.openui.sms.ui.theme.OpenUIPillBackground
-import org.openui.sms.ui.theme.OpenUITextSecondary
 
 @Composable
 fun SmsTopBar(
@@ -69,20 +67,21 @@ fun SmsTopBar(
     onSearchQueryChange: (String) -> Unit,
     onMarkAllAsReadClick: () -> Unit,
     onMakeDefaultAppClick: () -> Unit,
-    onSettingsClick: () -> Unit = {},
-    onAboutClick: () -> Unit = {},
+    onSettingsClick: () -> Unit,
+    onAboutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isSearchActive by remember { mutableStateOf(searchQuery.isNotEmpty()) }
+    val colors = AppTheme.colors
     var showMenu by remember { mutableStateOf(false) }
+    var isSearchActive by remember { mutableStateOf(searchQuery.isNotBlank()) }
 
     LaunchedEffect(searchQuery) {
-        if (searchQuery.isNotEmpty()) {
+        if (searchQuery.isNotBlank()) {
             isSearchActive = true
         }
     }
 
-    BackHandler(enabled = isSearchActive || searchQuery.isNotEmpty()) {
+    BackHandler(enabled = isSearchActive) {
         isSearchActive = false
         onSearchQueryChange("")
     }
@@ -133,7 +132,7 @@ fun SmsTopBar(
                         placeholder = {
                             Text(
                                 text = stringResource(R.string.search_messages),
-                                color = OpenUITextSecondary,
+                                color = colors.textSecondary,
                                 fontSize = 15.sp
                             )
                         },
@@ -141,19 +140,19 @@ fun SmsTopBar(
                             Icon(
                                 imageVector = Icons.Rounded.Search,
                                 contentDescription = null,
-                                tint = OpenUIOrangeBadge,
+                                tint = if (colors.isExpressive) colors.primaryBrand else OpenUIOrangeBadge,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(20.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = OpenUIOrangeBadge,
-                            unfocusedBorderColor = OpenUICardBackground,
-                            focusedContainerColor = OpenUICardBackground,
-                            unfocusedContainerColor = OpenUICardBackground
+                            focusedTextColor = colors.textPrimary,
+                            unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = if (colors.isExpressive) colors.primaryBrand else OpenUIOrangeBadge,
+                            unfocusedBorderColor = colors.cardElevated,
+                            focusedContainerColor = colors.card,
+                            unfocusedContainerColor = colors.card
                         ),
                         modifier = Modifier.weight(1f)
                     )
@@ -169,7 +168,7 @@ fun SmsTopBar(
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = stringResource(R.string.group_cancel),
-                            tint = Color.White
+                            tint = colors.textPrimary
                         )
                     }
                 }
@@ -194,14 +193,14 @@ fun SmsTopBar(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) OpenUIPillBackground else Color.Transparent)
+                                    .background(if (isSelected) colors.cardElevated else Color.Transparent)
                                     .clickable { onGroupSelect(groupName) }
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = groupName,
-                                    color = if (isSelected) Color.White else OpenUITextSecondary,
+                                    color = if (isSelected) colors.textPrimary else colors.textSecondary,
                                     fontSize = 16.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -214,7 +213,7 @@ fun SmsTopBar(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(OpenUICardBackground)
+                                .background(colors.card)
                                 .clickable { onCreateGroupClick() }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
@@ -222,7 +221,7 @@ fun SmsTopBar(
                             Icon(
                                 imageVector = Icons.Rounded.Add,
                                 contentDescription = stringResource(R.string.add_group),
-                                tint = Color.White,
+                                tint = colors.textPrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -235,7 +234,7 @@ fun SmsTopBar(
                             Icon(
                                 imageVector = Icons.Rounded.Search,
                                 contentDescription = stringResource(R.string.search),
-                                tint = Color.White,
+                                tint = colors.textPrimary,
                                 modifier = Modifier.size(26.dp)
                             )
                         }
@@ -245,7 +244,7 @@ fun SmsTopBar(
                                 Icon(
                                     imageVector = Icons.Rounded.MoreVert,
                                     contentDescription = stringResource(R.string.menu),
-                                    tint = Color.White,
+                                    tint = colors.textPrimary,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -253,31 +252,31 @@ fun SmsTopBar(
                             DropdownMenu(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false },
-                                modifier = Modifier.background(OpenUICardBackground)
+                                modifier = Modifier.background(colors.surface)
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.read_all), color = Color.White) },
+                                    text = { Text(stringResource(R.string.read_all), color = colors.textPrimary) },
                                     onClick = {
                                         showMenu = false
                                         onMarkAllAsReadClick()
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.make_default_app), color = Color.White) },
+                                    text = { Text(stringResource(R.string.make_default_app), color = colors.textPrimary) },
                                     onClick = {
                                         showMenu = false
                                         onMakeDefaultAppClick()
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.settings_title), color = Color.White) },
+                                    text = { Text(stringResource(R.string.settings_title), color = colors.textPrimary) },
                                     onClick = {
                                         showMenu = false
                                         onSettingsClick()
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.about_app), color = Color.White) },
+                                    text = { Text(stringResource(R.string.about_app), color = colors.textPrimary) },
                                     onClick = {
                                         showMenu = false
                                         onAboutClick()

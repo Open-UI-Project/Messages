@@ -14,7 +14,7 @@
     <string name="about_title">Messages</string>
     <string name="about_subtitle_prefix">An application from the </string>
     <string name="about_subtitle_project">Open UI Project</string>
-    <string name="about_badge">v2.0.0 • Open Source</string>
+    <string name="about_badge">v2.0.1 • Open Source</string>
     <string name="settings_title">Settings</string>
     <string name="ghost_mode_title">Ghost Mode</string>
     <string name="ghost_mode_subtitle">Read messages without marking them as read</string>
@@ -125,7 +125,7 @@
     <!-- About Dialog -->
     <string name="about_app_name">Contacts</string>
     <string name="about_subtitle">An Open UI Project App</string>
-    <string name="about_version_tag">v2.0.0 • Open Source</string>
+    <string name="about_version_tag">v2.0.1 • Open Source</string>
     <string name="about_goal">Our goal is to create a free, modern, open-source contacts application inspired by the elegance of One UI, without proprietary limitations.</string>
     <string name="about_privacy">The app is open-source, completely free of telemetry and data tracking, and developed transparently with the community. Join development!</string>
     <string name="about_tagline">Contacts — freedom, openness, and convenience in one app. 💙</string>
@@ -139,15 +139,6 @@
     <string name="group_cancel">Cancel</string>
     <string name="group_create">Create</string>
     <string name="group_all">All</string>
-    <string name="thread_attachment_image">📷 [Image]</string>
-    <string name="thread_attachment_camera">📷 [Camera Photo]</string>
-    <string name="thread_attachment_contact_item">👤 Contact</string>
-    <string name="thread_attachment_contact">👤 [Contact]</string>
-    <string name="thread_attachment_location_item">📍 Location</string>
-    <string name="thread_attachment_location">📍 [Location]</string>
-    <string name="thread_attachment_file_item">📁 File</string>
-    <string name="thread_attachment_file">📁 [Attachment]</string>
-    <string name="thread_attachment_audio">🎤 [Voice message 0:05]</string>
     <string name="thread_copy">Copy</string>
     <string name="thread_copied">Text copied</string>
     <string name="thread_forward">Forward</string>
@@ -178,4 +169,31 @@
     <string name="contacts_manage_change">Change</string>
     <string name="perm_grant_btn">Grant access</string>
     <string name="perm_settings_btn">Open app settings</string>
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_style_title">Design Style</string>
+    <string name="settings_style_openui">OpenUI Project Style</string>
+    <string name="settings_style_expressive">Material 3 Expressive</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_privacy">Privacy</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_theme_system_desc">Follow the system setting</string>
+    <string name="settings_theme_dark_desc">Always use dark colors</string>
+    <string name="settings_theme_light_desc">Always use light colors</string>
+    <string name="settings_style_openui_desc">Compact dark interface inspired by One UI</string>
+    <string name="settings_style_expressive_desc">Material You with Monet colors from your wallpaper</string>
+    <string name="settings_monet_title">Dynamic color (Monet)</string>
+    <string name="settings_monet_subtitle">Build the palette from your wallpaper</string>
+    <string name="settings_material_you_title">Material You</string>
+    <string name="settings_wallpaper_not_set">Not set</string>
+    <string name="wallpaper_type_photo">Photo</string>
+    <string name="wallpaper_type_video">Video</string>
+    <string name="wallpaper_type_gif">GIF</string>
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="crop_dialog_title">Select Frame</string>
+    <string name="crop_dialog_subtitle">Drag and pinch to adjust the wallpaper area</string>
+    <string name="crop_dialog_apply">Set Frame</string>
+    <string name="crop_dialog_cancel">Cancel</string>
 </resources>

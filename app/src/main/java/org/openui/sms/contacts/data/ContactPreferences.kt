@@ -22,7 +22,6 @@ class ContactPreferences(private val context: Context) {
     private val localPrefs: SharedPreferences = context.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)
 
     companion object {
-        private const val CONTACTS_APP_PKG = "org.openui.contacts"
         private const val CONTACTS_PROVIDER_URI = "content://org.openui.contacts.provider"
         private const val SMS_PROVIDER_URI = "content://org.openui.sms.contacts.provider"
 
@@ -40,15 +39,6 @@ class ContactPreferences(private val context: Context) {
             val res = context.contentResolver.call(uri, METHOD_GET_PREF, key, null)
             if (res != null && res.containsKey(KEY_PREF_VALUE)) {
                 return res.getString(KEY_PREF_VALUE) ?: defaultValue
-            }
-        } catch (_: Exception) {
-        }
-
-        try {
-            val otherContext = context.createPackageContext(CONTACTS_APP_PKG, Context.CONTEXT_IGNORE_SECURITY)
-            val otherPrefs = otherContext.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)
-            if (otherPrefs.contains(key)) {
-                return otherPrefs.getString(key, defaultValue)
             }
         } catch (_: Exception) {
         }
@@ -76,17 +66,6 @@ class ContactPreferences(private val context: Context) {
             }
         } catch (_: Exception) {
         }
-
-        try {
-            val otherContext = context.createPackageContext(CONTACTS_APP_PKG, Context.CONTEXT_IGNORE_SECURITY)
-            val otherPrefs = otherContext.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)
-            if (value == null) {
-                otherPrefs.edit().remove(key).apply()
-            } else {
-                otherPrefs.edit().putString(key, value).apply()
-            }
-        } catch (_: Exception) {
-        }
     }
 
     private fun getSharedStringSet(key: String): Set<String> {
@@ -96,15 +75,6 @@ class ContactPreferences(private val context: Context) {
             if (res != null && res.containsKey(KEY_PREF_VALUE)) {
                 val list = res.getStringArrayList(KEY_PREF_VALUE)
                 if (list != null) return list.toSet()
-            }
-        } catch (_: Exception) {
-        }
-
-        try {
-            val otherContext = context.createPackageContext(CONTACTS_APP_PKG, Context.CONTEXT_IGNORE_SECURITY)
-            val otherPrefs = otherContext.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)
-            if (otherPrefs.contains(key)) {
-                return otherPrefs.getStringSet(key, emptySet()) ?: emptySet()
             }
         } catch (_: Exception) {
         }
@@ -122,13 +92,6 @@ class ContactPreferences(private val context: Context) {
                 putStringArrayList(KEY_PREF_VALUE, ArrayList(set))
             }
             context.contentResolver.call(uri, METHOD_SET_PREF, key, extras)
-        } catch (_: Exception) {
-        }
-
-        try {
-            val otherContext = context.createPackageContext(CONTACTS_APP_PKG, Context.CONTEXT_IGNORE_SECURITY)
-            val otherPrefs = otherContext.getSharedPreferences("open_sms_contact_prefs", Context.MODE_PRIVATE)
-            otherPrefs.edit().putStringSet(key, set).apply()
         } catch (_: Exception) {
         }
     }

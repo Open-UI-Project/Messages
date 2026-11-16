@@ -33,10 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import org.openui.sms.ui.theme.OpenUICardBackground
-import org.openui.sms.ui.theme.OpenUIOrangeBadge
-import org.openui.sms.ui.theme.OpenUISurface
-import org.openui.sms.ui.theme.OpenUITextSecondary
+import org.openui.sms.ui.theme.AppTheme
 
 @Composable
 fun NewSmsDialog(
@@ -46,11 +43,12 @@ fun NewSmsDialog(
 ) {
     var recipient by remember { mutableStateOf(initialRecipient) }
     var messageText by remember { mutableStateOf("") }
+    val colors = AppTheme.colors
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = OpenUISurface,
+            color = colors.surface,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -60,7 +58,7 @@ fun NewSmsDialog(
             ) {
                 Text(
                     text = stringResource(R.string.new_sms_title),
-                    color = Color.White,
+                    color = colors.textPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -75,12 +73,12 @@ fun NewSmsDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = OpenUIOrangeBadge,
-                        unfocusedBorderColor = OpenUICardBackground,
-                        focusedLabelColor = OpenUIOrangeBadge,
-                        unfocusedLabelColor = OpenUITextSecondary
+                        focusedTextColor = colors.textPrimary,
+                        unfocusedTextColor = colors.textPrimary,
+                        focusedBorderColor = colors.primaryBrand,
+                        unfocusedBorderColor = colors.divider,
+                        focusedLabelColor = colors.primaryBrand,
+                        unfocusedLabelColor = colors.textSecondary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -93,12 +91,12 @@ fun NewSmsDialog(
                     label = { Text(stringResource(R.string.new_sms_text_label)) },
                     placeholder = { Text(stringResource(R.string.new_sms_text_placeholder)) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = OpenUIOrangeBadge,
-                        unfocusedBorderColor = OpenUICardBackground,
-                        focusedLabelColor = OpenUIOrangeBadge,
-                        unfocusedLabelColor = OpenUITextSecondary
+                        focusedTextColor = colors.textPrimary,
+                        unfocusedTextColor = colors.textPrimary,
+                        focusedBorderColor = colors.primaryBrand,
+                        unfocusedBorderColor = colors.divider,
+                        focusedLabelColor = colors.primaryBrand,
+                        unfocusedLabelColor = colors.textSecondary
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -115,7 +113,7 @@ fun NewSmsDialog(
                     TextButton(onClick = onDismiss) {
                         Text(
                             text = stringResource(R.string.group_cancel),
-                            color = OpenUITextSecondary,
+                            color = colors.textSecondary,
                             fontSize = 15.sp
                         )
                     }
@@ -131,14 +129,16 @@ fun NewSmsDialog(
                         },
                         enabled = recipient.isNotBlank() && messageText.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = OpenUIOrangeBadge,
-                            disabledContainerColor = OpenUICardBackground
+                            containerColor = colors.primaryBrand,
+                            contentColor = colors.onAccent,
+                            disabledContainerColor = colors.cardElevated,
+                            disabledContentColor = colors.textMuted
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(18.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.new_sms_send),
-                            color = Color.White,
+                            color = colors.onAccent,
                             fontWeight = FontWeight.Bold
                         )
                     }

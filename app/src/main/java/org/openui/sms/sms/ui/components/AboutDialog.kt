@@ -47,13 +47,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.openui.sms.R
-import org.openui.sms.ui.theme.OpenUITextSecondary
+import org.openui.sms.ui.theme.AppTheme
 
 @Composable
 fun AboutDialog(
     onDismissRequest: () -> Unit
 ) {
     val context = LocalContext.current
+    val colors = AppTheme.colors
     val githubUrl = "https://github.com/Open-UI-Project/Messages"
 
     Dialog(
@@ -64,7 +65,7 @@ fun AboutDialog(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .clip(RoundedCornerShape(28.dp)),
-            color = Color(0xFF111622)
+            color = colors.surface
         ) {
             Box(
                 modifier = Modifier.padding(20.dp)
@@ -80,7 +81,7 @@ fun AboutDialog(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF2B82FB)),
+                            .background(colors.primaryBrand),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -92,7 +93,7 @@ fun AboutDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = stringResource(R.string.about_title),
-                        color = Color.White,
+                        color = colors.textPrimary,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -100,12 +101,12 @@ fun AboutDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = stringResource(R.string.about_subtitle_prefix),
-                            color = OpenUITextSecondary,
+                            color = colors.textSecondary,
                             fontSize = 14.sp
                         )
                         Text(
                             text = stringResource(R.string.about_subtitle_project),
-                            color = Color(0xFF2B82FB),
+                            color = colors.primaryBrand,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -114,12 +115,12 @@ fun AboutDialog(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0x332B82FB))
+                            .background(colors.primaryBrand.copy(alpha = 0.18f))
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.about_badge),
-                            color = Color(0xFF2B82FB),
+                            color = colors.primaryBrand,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -129,27 +130,27 @@ fun AboutDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF1B2230))
+                            .background(colors.card)
                             .padding(16.dp)
                     ) {
                         Column {
                             Text(
                                 text = stringResource(R.string.about_description_p1),
-                                color = Color(0xEEFFFFFF),
+                                color = colors.textPrimary.copy(alpha = 0.9f),
                                 fontSize = 13.5.sp,
                                 lineHeight = 19.sp
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = stringResource(R.string.about_description_p2),
-                                color = Color(0xEEFFFFFF),
+                                color = colors.textPrimary.copy(alpha = 0.9f),
                                 fontSize = 13.5.sp,
                                 lineHeight = 19.sp
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = stringResource(R.string.about_description_p3),
-                                color = Color(0xFF2B82FB),
+                                color = colors.primaryBrand,
                                 fontSize = 13.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 lineHeight = 19.sp
@@ -165,7 +166,7 @@ fun AboutDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF1B2230))
+                                .background(colors.card)
                                 .padding(vertical = 12.dp, horizontal = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -173,13 +174,13 @@ fun AboutDialog(
                                 Icon(
                                     imageVector = Icons.Rounded.Code,
                                     contentDescription = null,
-                                    tint = Color(0xFF2B82FB),
+                                    tint = colors.primaryBrand,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = stringResource(R.string.about_feature_open_source),
-                                    color = Color.White,
+                                    color = colors.textPrimary,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
@@ -190,7 +191,7 @@ fun AboutDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF1B2230))
+                                .background(colors.card)
                                 .padding(vertical = 12.dp, horizontal = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -198,13 +199,13 @@ fun AboutDialog(
                                 Icon(
                                     imageVector = Icons.Rounded.Shield,
                                     contentDescription = null,
-                                    tint = Color(0xFF2B82FB),
+                                    tint = colors.primaryBrand,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = stringResource(R.string.about_feature_no_tracking),
-                                    color = Color.White,
+                                    color = colors.textPrimary,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
@@ -215,7 +216,7 @@ fun AboutDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF1B2230))
+                                .background(colors.card)
                                 .padding(vertical = 12.dp, horizontal = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -223,13 +224,13 @@ fun AboutDialog(
                                 Icon(
                                     imageVector = Icons.Rounded.Favorite,
                                     contentDescription = null,
-                                    tint = Color(0xFF2B82FB),
+                                    tint = colors.primaryBrand,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = stringResource(R.string.about_feature_community),
-                                    color = Color.White,
+                                    color = colors.textPrimary,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
@@ -254,8 +255,8 @@ fun AboutDialog(
                             .height(50.dp),
                         shape = RoundedCornerShape(25.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2B82FB),
-                            contentColor = Color.White
+                            containerColor = colors.primaryBrand,
+                            contentColor = colors.onAccent
                         )
                     ) {
                         Row(
@@ -279,7 +280,7 @@ fun AboutDialog(
                     TextButton(onClick = onDismissRequest) {
                         Text(
                             text = stringResource(R.string.about_close),
-                            color = OpenUITextSecondary,
+                            color = colors.textSecondary,
                             fontSize = 14.sp
                         )
                     }
@@ -289,7 +290,7 @@ fun AboutDialog(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(Color(0x33FFFFFF))
+                        .background(colors.cardElevated)
                         .clickable { onDismissRequest() }
                         .align(Alignment.TopEnd),
                     contentAlignment = Alignment.Center
@@ -297,7 +298,7 @@ fun AboutDialog(
                     Icon(
                         imageVector = Icons.Rounded.Close,
                         contentDescription = stringResource(R.string.about_close),
-                        tint = Color.White,
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(18.dp)
                     )
                 }

@@ -44,13 +44,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -107,10 +118,36 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         enableHighRefreshRate()
+        handleIncomingIntent(intent)
 
         setContent {
             MyApplicationTheme {
                 SmsAppScreen(viewModel = viewModel)
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        if (action == Intent.ACTION_SENDTO || action == Intent.ACTION_VIEW || action == Intent.ACTION_SEND) {
+            val uri = intent.data
+            var address = intent.getStringExtra("address")
+            if (address.isNullOrBlank() && uri != null) {
+                val scheme = uri.scheme?.lowercase()
+                if (scheme == "sms" || scheme == "smsto" || scheme == "mms" || scheme == "mmsto") {
+                    address = uri.schemeSpecificPart?.substringBefore("?")
+                }
+            }
+            if (!address.isNullOrBlank()) {
+                val clean = Uri.decode(address).trim()
+                viewModel.openThreadForNumber(clean)
             }
         }
     }
@@ -187,6 +224,17 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
     val appSettings = remember(context) { AppSettings.getInstance(context) }
     val wallpaperUri by appSettings.wallpaperUri.collectAsState()
     val wallpaperType by appSettings.wallpaperType.collectAsState()
+    val colors = org.openui.sms.ui.theme.AppTheme.colors
+
+    val notificationManager = remember(context) {
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+    }
+
+    LaunchedEffect(selectedThreadId) {
+        if (selectedThreadId != null) {
+            notificationManager?.cancelAll()
+        }
+    }
 
     val permissions = arrayOf(
         Manifest.permission.READ_SMS,
@@ -287,7 +335,8 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
 
     if (showSettingsDialog) {
         SettingsDialog(
-            onDismissRequest = { showSettingsDialog = false }
+            onDismissRequest = { showSettingsDialog = false },
+            onAboutClick = { showAboutDialog = true }
         )
     }
 
@@ -318,7 +367,13 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(OpenUIBlack.copy(alpha = 0.65f))
+                    .background(
+                        if (colors.isExpressive) {
+                            colors.surface.copy(alpha = 0.82f)
+                        } else {
+                            OpenUIBlack.copy(alpha = 0.65f)
+                        }
+                    )
             )
         }
 
@@ -425,7 +480,7 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(if (wallpaperUri != null) Color.Transparent else OpenUIBlack)
+                    .background(if (wallpaperUri != null) Color.Transparent else colors.background)
             ) {
                 AnimatedContent(
                     targetState = selectedTab,
@@ -477,7 +532,7 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                         .fillMaxWidth()
                                         .weight(1f)
                                         .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                                        .background(if (wallpaperUri != null) OpenUICardBackground.copy(alpha = 0.85f) else OpenUICardBackground)
+                                        .background(if (wallpaperUri != null) colors.card.copy(alpha = 0.85f) else colors.card)
                                 ) {
                                 if (permissionStatus == org.openui.sms.sms.ui.PermissionStatus.DENIED) {
                                     Column(
@@ -489,21 +544,21 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                     ) {
                                         Text(
                                             text = stringResource(R.string.perm_required_title),
-                                            color = Color.White,
+                                            color = colors.textPrimary,
                                             fontSize = 20.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text(
                                             text = stringResource(R.string.perm_required_desc),
-                                            color = OpenUITextSecondary,
+                                            color = colors.textSecondary,
                                             fontSize = 14.sp,
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                         )
                                         Spacer(modifier = Modifier.height(24.dp))
                                         Button(
                                             onClick = { permissionLauncher.launch(permissions) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = OpenUIOrangeBadge),
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (colors.isExpressive) colors.primaryBrand else OpenUIOrangeBadge),
                                             shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Text(stringResource(R.string.perm_grant_btn), color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -518,7 +573,7 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                                 context.startActivity(intent)
                                             }
                                         ) {
-                                            Text(stringResource(R.string.perm_settings_btn), color = OpenUITextSecondary)
+                                            Text(stringResource(R.string.perm_settings_btn), color = colors.textSecondary)
                                         }
                                     }
                                 } else if (isLoading) {
@@ -526,7 +581,7 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        CircularProgressIndicator(color = OpenUIOrangeBadge)
+                                        CircularProgressIndicator(color = if (colors.isExpressive) colors.primaryBrand else OpenUIOrangeBadge)
                                     }
                                 } else if (filteredConversations.isEmpty()) {
                                     Box(
@@ -535,7 +590,7 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                                     ) {
                                         Text(
                                             text = if (searchQuery.isNotBlank()) stringResource(R.string.nothing_found) else stringResource(R.string.no_messages),
-                                            color = Color.White,
+                                            color = colors.textPrimary,
                                             fontSize = 18.sp
                                         )
                                     }
@@ -604,22 +659,89 @@ fun SmsAppScreen(viewModel: SmsViewModel) {
                 }
 
                 if (!isContactDetailOpen) {
-                    SmsIslandNavigationBar(
-                        selectedTab = selectedTab,
-                        onTabSelected = { viewModel.setSelectedTab(it) },
-                        totalUnreadCount = allConversations.sumOf { it.unreadCount },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 8.dp)
-                    )
+                    if (colors.isExpressive) {
+                        NavigationBar(
+                            containerColor = if (wallpaperUri != null) colors.surface.copy(alpha = 0.85f) else colors.surface,
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        ) {
+                            val conversationsLabel = stringResource(SmsTab.CONVERSATIONS.titleRes)
+                            val contactsLabel = stringResource(SmsTab.CONTACTS.titleRes)
+                            NavigationBarItem(
+                                selected = selectedTab == SmsTab.CONVERSATIONS,
+                                onClick = { viewModel.setSelectedTab(SmsTab.CONVERSATIONS) },
+                                icon = {
+                                    val unread = allConversations.sumOf { it.unreadCount }
+                                    BadgedBox(
+                                        badge = {
+                                            if (unread > 0) {
+                                                Badge(containerColor = colors.primaryBrand) {
+                                                    Text(unread.toString(), color = colors.onAccent)
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Rounded.ChatBubble, contentDescription = null)
+                                    }
+                                },
+                                label = { Text(conversationsLabel) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = colors.primaryBrand.copy(alpha = 0.2f),
+                                    selectedIconColor = colors.primaryBrand,
+                                    selectedTextColor = colors.primaryBrand,
+                                    unselectedIconColor = colors.textSecondary,
+                                    unselectedTextColor = colors.textSecondary
+                                )
+                            )
+                            NavigationBarItem(
+                                selected = selectedTab == SmsTab.CONTACTS,
+                                onClick = { viewModel.setSelectedTab(SmsTab.CONTACTS) },
+                                icon = {
+                                    Icon(Icons.Rounded.Person, contentDescription = null)
+                                },
+                                label = { Text(contactsLabel) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = colors.primaryBrand.copy(alpha = 0.2f),
+                                    selectedIconColor = colors.primaryBrand,
+                                    selectedTextColor = colors.primaryBrand,
+                                    unselectedIconColor = colors.textSecondary,
+                                    unselectedTextColor = colors.textSecondary
+                                )
+                            )
+                        }
 
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 20.dp, bottom = 18.dp)
-                    ) {
-                        SmsFab(onClick = { showNewSmsDialog = true })
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(end = 20.dp, bottom = 80.dp)
+                        ) {
+                            FloatingActionButton(
+                                onClick = { showNewSmsDialog = true },
+                                containerColor = colors.primaryBrand,
+                                contentColor = colors.onAccent,
+                                shape = RoundedCornerShape(18.dp)
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.new_sms_title))
+                            }
+                        }
+                    } else {
+                        SmsIslandNavigationBar(
+                            selectedTab = selectedTab,
+                            onTabSelected = { viewModel.setSelectedTab(it) },
+                            totalUnreadCount = allConversations.sumOf { it.unreadCount },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 8.dp)
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(end = 20.dp, bottom = 18.dp)
+                        ) {
+                            SmsFab(onClick = { showNewSmsDialog = true })
+                        }
                     }
                 }
             }

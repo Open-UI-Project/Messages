@@ -14,7 +14,7 @@
     <string name="about_title">Сообщения</string>
     <string name="about_subtitle_prefix">Приложение от </string>
     <string name="about_subtitle_project">Open UI Project</string>
-    <string name="about_badge">v2.0.0 • Открытый исходный код</string>
+    <string name="about_badge">v2.0.1 • Открытый исходный код</string>
     <string name="settings_title">Настройки</string>
     <string name="ghost_mode_title">Режим Призрака</string>
     <string name="ghost_mode_subtitle">Чтение сообщений без отметки о прочтении</string>
@@ -126,7 +126,7 @@
     <!-- About Dialog -->
     <string name="about_app_name">Контакты</string>
     <string name="about_subtitle">Приложение от Open UI Project</string>
-    <string name="about_version_tag">v2.0.0 • Открытый исходный код</string>
+    <string name="about_version_tag">v2.0.1 • Открытый исходный код</string>
     <string name="about_goal">Наша цель — создать бесплатное, открытое и современное приложение для управления контактами, вдохновлённое удобством One UI, но без проприетарных ограничений.</string>
     <string name="about_privacy">Приложение имеет открытый исходный код, полностью лишено телеметрии и сбора данных, и разрабатывается прозрачно вместе с сообществом. Присоединяйтесь к разработке!</string>
     <string name="about_tagline">Контакты — свобода, открытость и удобство в одном приложении. 💙</string>
@@ -140,15 +140,6 @@
     <string name="group_cancel">Отмена</string>
     <string name="group_create">Создать</string>
     <string name="group_all">Все</string>
-    <string name="thread_attachment_image">📷 [Изображение]</string>
-    <string name="thread_attachment_camera">📷 [Фотография с камеры]</string>
-    <string name="thread_attachment_contact_item">👤 Контакт</string>
-    <string name="thread_attachment_contact">👤 [Контакт]</string>
-    <string name="thread_attachment_location_item">📍 Локация</string>
-    <string name="thread_attachment_location">📍 [Геолокация]</string>
-    <string name="thread_attachment_file_item">📁 Файл</string>
-    <string name="thread_attachment_file">📁 [Вложение]</string>
-    <string name="thread_attachment_audio">🎤 [Голосовое сообщение 0:05]</string>
     <string name="thread_copy">Копировать</string>
     <string name="thread_copied">Текст скопирован</string>
     <string name="thread_forward">Переслать</string>
@@ -178,4 +169,31 @@
     <string name="perm_required_desc">Для отображения ваших SMS и контактов, пожалуйста, предоставьте необходимые разрешения.</string>
     <string name="perm_grant_btn">Предоставить доступ</string>
     <string name="perm_settings_btn">Открыть настройки приложения</string>
+    <string name="settings_theme_title">Тема</string>
+    <string name="settings_theme_system">Системная</string>
+    <string name="settings_theme_dark">Тёмная</string>
+    <string name="settings_theme_light">Светлая</string>
+    <string name="settings_style_title">Стиль интерфейса</string>
+    <string name="settings_style_openui">OpenUI Project Style</string>
+    <string name="settings_style_expressive">Material 3 Expressive</string>
+    <string name="settings_section_appearance">Оформление</string>
+    <string name="settings_section_privacy">Приватность</string>
+    <string name="settings_section_about">О приложении</string>
+    <string name="settings_theme_system_desc">Как в системе</string>
+    <string name="settings_theme_dark_desc">Всегда тёмное оформление</string>
+    <string name="settings_theme_light_desc">Всегда светлое оформление</string>
+    <string name="settings_style_openui_desc">Компактный тёмный интерфейс в духе One UI</string>
+    <string name="settings_style_expressive_desc">Material You с палитрой Monet из ваших обоев</string>
+    <string name="settings_monet_title">Динамические цвета (Monet)</string>
+    <string name="settings_monet_subtitle">Подстраивать палитру под обои</string>
+    <string name="settings_material_you_title">Material You</string>
+    <string name="settings_wallpaper_not_set">Не установлены</string>
+    <string name="wallpaper_type_photo">Фото</string>
+    <string name="wallpaper_type_video">Видео</string>
+    <string name="wallpaper_type_gif">GIF</string>
+    <string name="settings_about_version">Версия %1$s</string>
+    <string name="crop_dialog_title">Выбрать фрагмент</string>
+    <string name="crop_dialog_subtitle">Перемещайте и масштабируйте для выбора области обоев</string>
+    <string name="crop_dialog_apply">Установить фрагмент</string>
+    <string name="crop_dialog_cancel">Отмена</string>
 </resources>

@@ -201,6 +201,28 @@ class SmsViewModel(private val repository: SmsRepository) : ViewModel() {
         }
     }
 
+    fun openThreadForNumber(rawNumber: String) {
+        if (rawNumber.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val clean = rawNumber.trim()
+            val allConvs = conversations.value
+            val existing = allConvs.find { conv ->
+                conv.address == clean || (clean.length >= 7 && conv.address.endsWith(clean.takeLast(7)))
+            }
+            val contactMatch = contacts.value.find { contact ->
+                val cNum = contact.number.replace(Regex("[^0-9+]"), "")
+                val cleanNum = clean.replace(Regex("[^0-9+]"), "")
+                cNum == cleanNum || (cleanNum.length >= 7 && cNum.endsWith(cleanNum.takeLast(7)))
+            }
+            val title = contactMatch?.name ?: existing?.title ?: clean
+            if (existing != null) {
+                selectThread(existing.threadId, existing.address, title)
+            } else {
+                selectThread(-1L, clean, title)
+            }
+        }
+    }
+
     fun sendSms(recipient: String, body: String) {
         if (recipient.isBlank() || body.isBlank()) return
         viewModelScope.launch {

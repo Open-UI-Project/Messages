@@ -22,8 +22,8 @@ import org.openui.sms.contacts.model.ContactItem
 import org.openui.sms.sms.model.MessageBoxType
 import org.openui.sms.sms.model.SmsConversation
 import org.openui.sms.sms.model.SmsMessage
+import org.openui.sms.sms.receiver.SmsStatusReceiver
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -50,12 +50,11 @@ interface SmsRepository {
 class DefaultSmsRepository(private val context: Context) : SmsRepository {
 
     private val contentResolver: ContentResolver = context.contentResolver
-    private val contactCache = LruCache<String, String>(200)
 
     override fun getConversations(): Flow<List<SmsConversation>> = callbackFlow {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                this@callbackFlow.launch(Dispatchers.IO) {
                     trySend(loadConversationsInternal())
                 }
             }
@@ -85,7 +84,7 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     override fun getMessagesForThread(threadId: Long): Flow<List<SmsMessage>> = callbackFlow {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                this@callbackFlow.launch(Dispatchers.IO) {
                     trySend(loadMessagesForThreadInternal(threadId))
                 }
             }
@@ -115,11 +114,7 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     private fun loadConversationsInternal(): List<SmsConversation> {
         var list = queryConversationsFromUri(Telephony.Sms.CONTENT_URI)
         if (list.isEmpty()) {
-            Log.w(TAG, "Telephony.Sms.CONTENT_URI returned 0 items, trying mms-sms/conversations")
-            list = queryConversationsFromUri(Uri.parse("content://mms-sms/conversations?simple=true"))
-        }
-        if (list.isEmpty()) {
-            Log.w(TAG, "mms-sms/conversations returned 0 items, trying inbox/sent fallback")
+            Log.w(TAG, "Telephony.Sms.CONTENT_URI returned 0 items, trying inbox/sent fallback")
             val inboxList = queryConversationsFromUri(Uri.parse("content://sms/inbox"))
             val sentList = queryConversationsFromUri(Uri.parse("content://sms/sent"))
             list = mergeConversations(inboxList + sentList)
@@ -198,15 +193,16 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
         fillMissingAddresses(conversationsMap)
 
         return conversationsMap.values.map { builder ->
-            val contactName = resolveContactNameSync(builder.address)
+            val contactInfo = resolveContactInfoSync(builder.address)
             SmsConversation(
                 threadId = builder.threadId,
                 address = builder.address,
-                contactName = contactName,
+                contactName = contactInfo.name,
                 snippet = builder.snippet,
                 unreadCount = builder.unreadCount,
                 messageCount = builder.messageCount,
-                lastTimestamp = builder.lastTimestamp
+                lastTimestamp = builder.lastTimestamp,
+                photoUri = contactInfo.photoUri
             )
         }.sortedByDescending { it.lastTimestamp }
     }
@@ -361,7 +357,7 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
         val readIdx = cursor.getColumnIndex(Telephony.Sms.READ)
         val typeIdx = cursor.getColumnIndex(Telephony.Sms.TYPE)
 
-        var contactNameCached: String? = null
+        var contactInfoCached: ResolvedContactInfo? = null
         var firstAddress = ""
         val seenIds = mutableSetOf<Long>()
 
@@ -370,9 +366,9 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
             if (id > 0 && !seenIds.add(id)) continue
 
             val address = if (addressIdx != -1) cursor.getString(addressIdx) ?: "" else ""
-            if (contactNameCached == null && address.isNotBlank()) {
+            if (contactInfoCached == null && address.isNotBlank()) {
                 firstAddress = address
-                contactNameCached = resolveContactNameSync(address)
+                contactInfoCached = resolveContactInfoSync(address)
             }
             val body = if (bodyIdx != -1) cursor.getString(bodyIdx) ?: "" else ""
             val timestamp = if (dateIdx != -1) cursor.getLong(dateIdx) else 0L
@@ -392,11 +388,12 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
                     id = id,
                     threadId = threadId,
                     address = if (address.isBlank()) firstAddress else address,
-                    contactName = contactNameCached,
+                    contactName = contactInfoCached?.name,
                     body = body,
                     timestamp = timestamp,
                     isRead = isRead,
-                    boxType = type
+                    boxType = type,
+                    photoUri = contactInfoCached?.photoUri
                 )
             )
         }
@@ -416,13 +413,19 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
             }
 
             val sentIntent = PendingIntent.getBroadcast(
-                context, 0, Intent("SMS_SENT"),
-                PendingIntent.FLAG_IMMUTABLE
+                context,
+                1,
+                Intent(context, SmsStatusReceiver::class.java)
+                    .setAction(SmsStatusReceiver.ACTION_SMS_SENT),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
             val deliveredIntent = PendingIntent.getBroadcast(
-                context, 0, Intent("SMS_DELIVERED"),
-                PendingIntent.FLAG_IMMUTABLE
+                context,
+                2,
+                Intent(context, SmsStatusReceiver::class.java)
+                    .setAction(SmsStatusReceiver.ACTION_SMS_DELIVERED),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
             smsManager.sendTextMessage(recipient, null, body, sentIntent, deliveredIntent)
@@ -528,35 +531,57 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
     }
 
     private fun resolveContactNameSync(phoneNumber: String): String? {
-        if (phoneNumber.isBlank()) return null
+        return resolveContactInfoSync(phoneNumber).name
+    }
 
-        val cached = contactCache.get(phoneNumber)
-        if (cached != null) {
-            return if (cached == NO_CONTACT_NAME) null else cached
-        }
+    private fun resolveContactInfoSync(phoneNumber: String): ResolvedContactInfo {
+        if (phoneNumber.isBlank()) return ResolvedContactInfo(null, null)
 
-        var contactName: String? = null
+        val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")
+        val cacheKey = if (cleanNumber.length >= 7) cleanNumber.takeLast(7) else phoneNumber
+        val cached = contactInfoCache.get(cacheKey)
+        if (cached != null) return cached
+
+        var name: String? = null
+        var photoUri: String? = null
+
         try {
             val uri = Uri.withAppendedPath(
                 ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
                 Uri.encode(phoneNumber)
             )
-            val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+            val projection = arrayOf(
+                ContactsContract.PhoneLookup.DISPLAY_NAME,
+                ContactsContract.PhoneLookup.PHOTO_URI
+            )
 
             contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val nameIdx = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
-                    if (nameIdx != -1) {
-                        contactName = cursor.getString(nameIdx)
-                    }
+                    val photoIdx = cursor.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+                    if (nameIdx != -1) name = cursor.getString(nameIdx)
+                    if (photoIdx != -1) photoUri = cursor.getString(photoIdx)
                 }
             }
-        } catch (e: Exception) {
-            Log.d(TAG, "Could not resolve contact name for $phoneNumber")
+        } catch (_: Exception) {}
+
+        if (name.isNullOrBlank()) {
+            try {
+                val allContacts = ContactManager.getAllContacts(context)
+                val match = allContacts.find { c ->
+                    val itClean = c.number.replace(Regex("[^0-9+]"), "")
+                    itClean == cleanNumber || (cleanNumber.length >= 7 && itClean.endsWith(cleanNumber.takeLast(7)))
+                }
+                if (match != null) {
+                    name = match.name
+                    if (photoUri == null) photoUri = match.photoUri
+                }
+            } catch (_: Exception) {}
         }
 
-        contactCache.put(phoneNumber, contactName ?: NO_CONTACT_NAME)
-        return contactName
+        val result = ResolvedContactInfo(name, photoUri)
+        contactInfoCache.put(cacheKey, result)
+        return result
     }
 
     override suspend fun getAllContacts(): List<ContactItem> = withContext(Dispatchers.IO) {
@@ -572,9 +597,14 @@ class DefaultSmsRepository(private val context: Context) : SmsRepository {
         var messageCount: Int = 0
     )
 
+    data class ResolvedContactInfo(
+        val name: String?,
+        val photoUri: String?
+    )
+
     companion object {
         private const val TAG = "DefaultSmsRepository"
-        private const val NO_CONTACT_NAME = "__NO_NAME__"
+        private val contactInfoCache = LruCache<String, ResolvedContactInfo>(300)
     }
 }
 

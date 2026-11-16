@@ -22,11 +22,55 @@ class AppSettings(private val context: Context) {
     private val _wallpaperType = MutableStateFlow(prefs.getString(KEY_WALLPAPER_TYPE, TYPE_NONE) ?: TYPE_NONE)
     val wallpaperType: StateFlow<String> = _wallpaperType.asStateFlow()
 
+    private val _themeMode = MutableStateFlow(prefs.getString(KEY_THEME_MODE, THEME_SYSTEM) ?: THEME_SYSTEM)
+    val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    private val _designStyle = MutableStateFlow(prefs.getString(KEY_DESIGN_STYLE, STYLE_OPENUI) ?: STYLE_OPENUI)
+    val designStyle: StateFlow<String> = _designStyle.asStateFlow()
+
+    private val _monetEnabled = MutableStateFlow(prefs.getBoolean(KEY_MONET_ENABLED, true))
+    val monetEnabled: StateFlow<Boolean> = _monetEnabled.asStateFlow()
+
     fun isGhostMode(): Boolean = _ghostMode.value
 
     fun setGhostMode(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_GHOST_MODE, enabled).apply()
         _ghostMode.value = enabled
+    }
+
+    fun setThemeMode(mode: String) {
+        prefs.edit().putString(KEY_THEME_MODE, mode).apply()
+        _themeMode.value = mode
+    }
+
+    fun setDesignStyle(style: String) {
+        prefs.edit().putString(KEY_DESIGN_STYLE, style).apply()
+        _designStyle.value = style
+    }
+
+    fun setMonetEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MONET_ENABLED, enabled).apply()
+        _monetEnabled.value = enabled
+    }
+
+    fun saveWallpaperFromBitmap(bitmap: android.graphics.Bitmap): Boolean {
+        return try {
+            val targetFile = File(context.filesDir, "custom_wallpaper.jpg")
+            FileOutputStream(targetFile).use { output ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, output)
+            }
+            val savedUriString = Uri.fromFile(targetFile).toString()
+            prefs.edit()
+                .putString(KEY_WALLPAPER_URI, savedUriString)
+                .putString(KEY_WALLPAPER_TYPE, TYPE_IMAGE)
+                .apply()
+            _wallpaperUri.value = savedUriString
+            _wallpaperType.value = TYPE_IMAGE
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     fun saveWallpaperFromUri(sourceUri: Uri, isVideo: Boolean): Boolean {
@@ -69,6 +113,8 @@ class AppSettings(private val context: Context) {
             if (file1.exists()) file1.delete()
             val file2 = File(context.filesDir, "custom_wallpaper.mp4")
             if (file2.exists()) file2.delete()
+            val file3 = File(context.filesDir, "custom_wallpaper.jpg")
+            if (file3.exists()) file3.delete()
         } catch (_: Exception) {}
 
         prefs.edit()
@@ -84,6 +130,16 @@ class AppSettings(private val context: Context) {
         private const val KEY_GHOST_MODE = "ghost_mode"
         private const val KEY_WALLPAPER_URI = "wallpaper_uri"
         private const val KEY_WALLPAPER_TYPE = "wallpaper_type"
+        private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_DESIGN_STYLE = "design_style"
+        private const val KEY_MONET_ENABLED = "monet_enabled"
+
+        const val THEME_SYSTEM = "system"
+        const val THEME_DARK = "dark"
+        const val THEME_LIGHT = "light"
+
+        const val STYLE_OPENUI = "openui"
+        const val STYLE_MATERIAL3_EXPRESSIVE = "material3_expressive"
 
         const val TYPE_NONE = "none"
         const val TYPE_IMAGE = "image"

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
@@ -44,9 +45,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,13 +72,13 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import org.openui.sms.R
 import org.openui.sms.ui.theme.AppTheme
+import org.openui.sms.ui.theme.OpenUIAvatarGrey
 import kotlinx.coroutines.launch
 import org.openui.sms.contacts.data.ContactManager
 import org.openui.sms.contacts.data.ContactPreferences
 import org.openui.sms.contacts.model.CallLogItem
 import org.openui.sms.contacts.model.CallType
 import org.openui.sms.contacts.model.ContactItem
-import org.openui.sms.contacts.model.getAvatarColor
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -167,17 +170,19 @@ fun ContactCallHistoryScreen(
         onBackClick()
     }
 
-    val avatarColor = remember(currentContact.name) { getAvatarColor(currentContact.name) }
-
     val groupedCallLogs = remember(callLogs, context) {
         val logs = callLogs ?: emptyList()
         logs.groupBy { item -> formatDateHeader(context, item.timestamp) }
     }
 
+    val appSettings = remember(context) { org.openui.sms.data.AppSettings.getInstance(context) }
+    val wallpaperUri by appSettings.wallpaperUri.collectAsState()
+    val isAnyWallpaperActive = wallpaperUri != null || customBgUri != null
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(colors.background)
+            .background(if (isAnyWallpaperActive) Color.Transparent else colors.background)
     ) {
         if (customBgUri != null) {
             AsyncImage(
@@ -235,22 +240,35 @@ fun ContactCallHistoryScreen(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(avatarColor),
+                        .background(
+                            when {
+                                !currentContact.photoUri.isNullOrBlank() -> Color.Transparent
+                                colors.isExpressive -> MaterialTheme.colorScheme.primaryContainer
+                                else -> OpenUIAvatarGrey
+                            }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (currentContact.photoUri != null) {
+                    if (!currentContact.photoUri.isNullOrBlank()) {
                         AsyncImage(
                             model = currentContact.photoUri,
                             contentDescription = currentContact.name,
                             modifier = Modifier.size(80.dp),
                             contentScale = ContentScale.Crop
                         )
-                    } else {
+                    } else if (colors.isExpressive) {
                         Text(
                             text = currentContact.initials.ifBlank { "#" },
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(38.dp)
                         )
                     }
                 }

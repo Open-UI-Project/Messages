@@ -56,6 +56,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SimCard
@@ -69,12 +70,14 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,6 +101,7 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import org.openui.sms.R
 import org.openui.sms.ui.theme.AppTheme
+import org.openui.sms.ui.theme.OpenUIAvatarGrey
 import kotlinx.coroutines.launch
 import org.openui.sms.sms.ui.components.AboutDialog
 import org.openui.sms.contacts.data.ContactManager
@@ -106,8 +110,6 @@ import org.openui.sms.contacts.data.SimAccountInfo
 import org.openui.sms.contacts.data.TrashContact
 import org.openui.sms.contacts.model.CallLogItem
 import org.openui.sms.contacts.model.ContactItem
-import org.openui.sms.contacts.model.getAvatarColor
-
 private val StarBadgeColor = Color(0xFFFFB800)
 private val ContactRowShape = RoundedCornerShape(22.dp)
 private val SearchFieldShape = RoundedCornerShape(20.dp)
@@ -309,10 +311,14 @@ fun SmsContactsScreen(
                 }
             )
         } else {
+            val appSettings = remember(context) { org.openui.sms.data.AppSettings.getInstance(context) }
+            val wallpaperUri by appSettings.wallpaperUri.collectAsState()
+            val isWallpaperActive = wallpaperUri != null
+
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(colors.background)
+                    .background(if (isWallpaperActive) Color.Transparent else colors.background)
                     .statusBarsPadding()
                     .padding(horizontal = 18.dp)
             ) {
@@ -844,7 +850,8 @@ fun SmsContactsScreen(
 
                 if (showSettingsDialog) {
                     SettingsDialog(
-                        onDismissRequest = { showSettingsDialog = false }
+                        onDismissRequest = { showSettingsDialog = false },
+                        onAboutClick = { showAboutDialog = true }
                     )
                 }
 
@@ -1091,7 +1098,6 @@ private fun ContactRowItem(
     modifier: Modifier = Modifier
 ) {
     val colors = AppTheme.colors
-    val avatarColor = remember(contact.name) { getAvatarColor(contact.name) }
     val initial = contact.initials.ifBlank { "#" }
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
@@ -1128,22 +1134,35 @@ private fun ContactRowItem(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(ContactCircleShape)
-                    .background(avatarColor),
+                    .background(
+                        when {
+                            !contact.photoUri.isNullOrBlank() -> Color.Transparent
+                            colors.isExpressive -> MaterialTheme.colorScheme.primaryContainer
+                            else -> OpenUIAvatarGrey
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                if (contact.photoUri != null) {
+                if (!contact.photoUri.isNullOrBlank()) {
                     AsyncImage(
                         model = contact.photoUri,
                         contentDescription = contact.name,
                         modifier = Modifier.size(42.dp),
                         contentScale = ContentScale.Crop
                     )
-                } else {
+                } else if (colors.isExpressive) {
                     Text(
                         text = initial,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Person,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
